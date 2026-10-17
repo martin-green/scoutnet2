@@ -29,6 +29,9 @@ pub enum ApiError {
     NotFound,
     #[error("{0}")]
     BadRequest(String),
+    /// Resursen är i ett tillstånd som inte tillåter ändringen (t.ex. ett möte som är rapporterat och låst).
+    #[error("{0}")]
+    Conflict(String),
     #[error("kräver färsk inloggning med MFA")]
     StepUpRequired,
     #[error(transparent)]
@@ -46,11 +49,12 @@ impl IntoResponse for ApiError {
             Self::Forbidden => (StatusCode::FORBIDDEN, "forbidden"),
             Self::NotFound => (StatusCode::NOT_FOUND, "not_found"),
             Self::BadRequest(_) => (StatusCode::BAD_REQUEST, "bad_request"),
+            Self::Conflict(_) => (StatusCode::CONFLICT, "conflict"),
             Self::StepUpRequired => (StatusCode::UNAUTHORIZED, "step_up_required"),
             Self::Database(_) | Self::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "internal"),
         };
         let detail = match &self {
-            Self::BadRequest(msg) => Some(msg.clone()),
+            Self::BadRequest(msg) | Self::Conflict(msg) => Some(msg.clone()),
             Self::Database(e) => {
                 tracing::error!(error = %e, "databasfel");
                 None

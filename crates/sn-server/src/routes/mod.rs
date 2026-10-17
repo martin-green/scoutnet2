@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 use crate::AppState;
 
+pub mod attendance;
 pub mod bodies;
 pub mod me;
 pub mod members;
@@ -21,7 +22,12 @@ pub struct BodyRef {
 }
 
 pub fn router() -> Router<AppState> {
-    Router::new().merge(me::router()).merge(bodies::router()).merge(members::router()).merge(people::router())
+    Router::new()
+        .merge(me::router())
+        .merge(bodies::router())
+        .merge(members::router())
+        .merge(people::router())
+        .merge(attendance::router())
 }
 
 /// Registrerar en händelse i revisionsloggen. Fel här får inte stoppa läsningen,

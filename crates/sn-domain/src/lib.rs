@@ -6,4 +6,4 @@ pub mod term;
 
 pub use body::{BodyKey, BodyKind, InvalidBodyKey, TroopType};
 pub use personnummer::{Personnummer, PersonnummerError};
-pub use term::{Half, Term};
+pub use term::{Half, Term, TermParseError};

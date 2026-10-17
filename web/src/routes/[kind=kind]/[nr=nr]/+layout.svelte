@@ -8,10 +8,26 @@
 	const subpages: Record<string, string> = {
 		medlemmar: 'Medlemmar',
 		vantelista: 'Väntelista',
-		organisation: 'Organisation'
+		organisation: 'Organisation',
+		narvaro: 'Närvaro'
 	};
-	const sub = $derived(page.route.id?.split('/').at(-1) ?? '');
-	const subLabel = $derived(subpages[sub]);
+	// Undersidor efter /[kind]/[nr]. Dynamiska delar (t.ex. ett möte) får sin etikett från sidans data (`crumb`).
+	const crumbs = $derived.by(() => {
+		const segments = (page.route.id ?? '').split('/').slice(3);
+		const out: { label: string; href: string }[] = [];
+		let path = '';
+		for (const s of segments) {
+			path = path ? `${path}/${s}` : s;
+			if (s.startsWith('[')) {
+				const label = (page.data as { crumb?: string }).crumb;
+				if (label) out.push({ label, href: page.url.pathname });
+			} else if (subpages[s]) {
+				out.push({ label: subpages[s], href: bodyHref(data.body, path) });
+			}
+		}
+		return out;
+	});
+	const subLabel = $derived(crumbs.at(-1)?.label);
 </script>
 
 <svelte:head>
@@ -30,15 +46,21 @@
 			</li>
 		{/each}
 		<li>
-			{#if subLabel}
+			{#if crumbs.length > 0}
 				<a href={bodyHref(data.body)}>{data.body.name}</a>
 			{:else}
 				<span aria-current="page">{data.body.name}</span>
 			{/if}
 		</li>
-		{#if subLabel}
-			<li><span aria-current="page">{subLabel}</span></li>
-		{/if}
+		{#each crumbs as c, i (c.href)}
+			<li>
+				{#if i < crumbs.length - 1}
+					<a href={c.href}>{c.label}</a>
+				{:else}
+					<span aria-current="page">{c.label}</span>
+				{/if}
+			</li>
+		{/each}
 	</ol>
 </nav>
 

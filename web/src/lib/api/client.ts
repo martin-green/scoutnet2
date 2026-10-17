@@ -8,6 +8,14 @@ export type Crumb = Schemas['CrumbDto'];
 export type BodyChild = Schemas['BodyChildDto'];
 export type OrgNode = Schemas['OrgNodeDto'];
 export type OrgNodePage = Schemas['OrgNodePage'];
+export type Meeting = Schemas['MeetingDto'];
+export type MeetingDetail = Schemas['MeetingDetail'];
+export type RosterEntry = Schemas['RosterEntry'];
+export type AttendanceMatrix = Schemas['AttendanceMatrix'];
+export type AttendanceSummary = Schemas['TermAttendanceSummary'];
+export type TroopAttendance = Schemas['TroopAttendanceSummary'];
+export type CreateMeetings = Schemas['CreateMeetings'];
+export type AttendanceStatus = 'present' | 'absent' | 'excused';
 export type MemberRow = Schemas['MemberRow'];
 export type MemberPage = Schemas['MemberPage'];
 export type PersonDetail = Schemas['PersonDetail'];
@@ -53,6 +61,16 @@ export const api = {
 	members: (id: string, query: URLSearchParams) =>
 		request<MemberPage>('GET', `/v1/bodies/${id}/members?${query}`),
 	person: (id: string) => request<PersonDetail>('GET', `/v1/people/${id}`),
+	attendanceSummary: (id: string, term?: string) =>
+		request<AttendanceSummary>('GET', `/v1/bodies/${id}/attendance/summary${term ? `?term=${encodeURIComponent(term)}` : ''}`),
+	attendance: (id: string, term?: string) =>
+		request<AttendanceMatrix>('GET', `/v1/bodies/${id}/attendance${term ? `?term=${encodeURIComponent(term)}` : ''}`),
+	createMeetings: (id: string, body: CreateMeetings) => request<Meeting[]>('POST', `/v1/bodies/${id}/meetings`, body),
+	meeting: (id: string) => request<MeetingDetail>('GET', `/v1/meetings/${id}`),
+	saveAttendance: (id: string, entries: { person_id: string; status: AttendanceStatus }[]) =>
+		request<MeetingDetail>('PUT', `/v1/meetings/${id}/attendance`, { entries }),
+	updateMeeting: (id: string, body: Schemas['UpdateMeeting']) => request<MeetingDetail>('PATCH', `/v1/meetings/${id}`, body),
+	deleteMeeting: (id: string) => request<void>('DELETE', `/v1/meetings/${id}`),
 	revealNationalId: (id: string) =>
 		request<{ national_id: string }>('POST', `/v1/people/${id}/reveal-national-id`),
 	personas: () => request<Persona[]>('GET', '/auth/dev/personas'),
@@ -180,6 +198,45 @@ export const redactedLabels: Record<string, string> = {
 };
 
 export const fmtDate = (d?: string | null) => (d ? new Date(d).toLocaleDateString('sv-SE') : '–');
+
+const weekdayFmt = new Intl.DateTimeFormat('sv-SE', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Stockholm' });
+const shortFmt = new Intl.DateTimeFormat('sv-SE', { day: 'numeric', month: 'numeric', timeZone: 'Europe/Stockholm' });
+const timeFmt = new Intl.DateTimeFormat('sv-SE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Stockholm' });
+/** "torsdag 22 oktober" */
+export const fmtWeekday = (d: string) => weekdayFmt.format(new Date(`${d}T12:00:00Z`));
+/** "22/10" */
+export const fmtShort = (d: string) => shortFmt.format(new Date(`${d}T12:00:00Z`));
+/** Datum och tid från en tidsstämpel, i svensk tid: "tors 22 okt 18:30". */
+export const fmtWhen = (ts: string) => {
+	const d = new Date(ts);
+	return `${new Intl.DateTimeFormat('sv-SE', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Europe/Stockholm' }).format(d)} ${timeFmt.format(d)}`;
+};
+
+export const meetingKindLabels: Record<string, string> = {
+	meeting: 'Möte',
+	hike: 'Hajk',
+	camp: 'Läger',
+	activity: 'Aktivitet'
+};
+
+export const attendanceLabels: Record<AttendanceStatus, Labelled & { icon: string }> = {
+	present: { label: 'Närvarande', tone: 'green', icon: '✓' },
+	absent: { label: 'Frånvarande', tone: 'red', icon: '✗' },
+	excused: { label: 'Anmält förhinder', tone: 'accent', icon: 'F' }
+};
+
+/** Termin som visas och används i adresser: "HT2026". */
+export const termKey = (label: string) => label.replace(/\s+/g, '');
+export function shiftTerm(label: string, delta: number): string {
+	const m = /^(VT|HT)\s*(\d{4})$/i.exec(label.trim());
+	if (!m) return label;
+	let half = m[1].toUpperCase() === 'HT' ? 1 : 0;
+	let year = Number(m[2]);
+	const idx = year * 2 + half + delta;
+	year = Math.floor(idx / 2);
+	half = idx % 2;
+	return `${half ? 'HT' : 'VT'}${year}`;
+}
 
 const sek = new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', maximumFractionDigits: 0 });
 export const fmtSek = (ore: number) => sek.format(ore / 100);

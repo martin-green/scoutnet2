@@ -41,6 +41,9 @@
 		goto('/login');
 	}
 
+	const permissions = $derived<string[]>(
+		body?.permissions ?? contexts.find((c) => c.body_id === current?.id)?.permissions ?? []
+	);
 	const nav = $derived(
 		current
 			? [
@@ -50,7 +53,9 @@
 						? [{ href: bodyHref(current, 'vantelista'), label: 'Väntelista', icon: '⏳' }]
 						: []),
 					...(current.kind !== 'patrol' ? [{ href: bodyHref(current, 'organisation'), label: 'Organisation', icon: '🌳' }] : []),
-					{ href: '', label: 'Närvaro', icon: '✅', soon: 'v.3' },
+					...(permissions.includes('attendance_read') && current.kind !== 'patrol'
+						? [{ href: bodyHref(current, 'narvaro'), label: 'Närvaro', icon: '✅' }]
+						: []),
 					{ href: '', label: 'Bidrag', icon: '📄', soon: 'v.4' }
 				]
 			: []
@@ -97,7 +102,11 @@
 							<span aria-hidden="true">{item.icon}</span>{item.label}<span class="badge">{item.soon}</span>
 						</span>
 					{:else}
-						<a class="navitem" class:active={page.url.pathname === item.href} href={item.href}>
+						<a
+							class="navitem"
+							class:active={page.url.pathname === item.href || (item.label !== 'Översikt' && page.url.pathname.startsWith(`${item.href}/`))}
+							href={item.href}
+						>
 							<span aria-hidden="true">{item.icon}</span>{item.label}
 						</a>
 					{/if}
@@ -246,12 +255,24 @@
 	}
 	@media (max-width: 800px) {
 		.shell {
-			grid-template-columns: 1fr;
+			grid-template-columns: minmax(0, 1fr);
 			grid-template-rows: auto auto 1fr;
 		}
 		.topbar {
 			flex-wrap: wrap;
 			padding: var(--space-2) var(--space-3);
+			gap: var(--space-2) var(--space-3);
+		}
+		.ctx {
+			order: 5;
+			flex: 1 1 100%;
+		}
+		.ctx select {
+			width: 100%;
+			max-width: none;
+		}
+		.user span:not(.avatar) {
+			display: none;
 		}
 		.ctx .muted {
 			display: none;

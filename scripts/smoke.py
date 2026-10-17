@@ -156,6 +156,43 @@ st, ld, _ = call(leader, "GET", f"/v1/people/{tpage['items'][0]['id']}")
 check(st == 200 and ld["fees"] is None and ld["note"] is None and ld["police_check"] is not None,
       "avdelningsledare: registerutdrag ja, avgifter och anteckning nej")
 
+# Närvaro (vecka 3)
+tkey = f"troop-{troop_ctx['body_number']}"
+st, mx, _ = call(leader, "GET", f"/v1/bodies/{tkey}/attendance")
+past = [m for m in mx["meetings"] if m["is_past"]]
+check(st == 200 and mx["can_write"] and past and len(mx["people"]) >= tpage["total"]
+      and all(len(p["statuses"]) == len(mx["meetings"]) for p in mx["people"]),
+      f"närvarolista {mx['term']}: {len(mx['meetings'])} möten × {len(mx['people'])} personer")
+st, created, _ = call(leader, "POST", f"/v1/bodies/{tkey}/meetings",
+                      {"name": "Rökprov", "date": "2027-02-02", "time": "18:00", "duration_min": 90,
+                       "repeat_until": "2027-02-23", "skip_dates": ["2027-02-16"]}, {"x-sn-csrf": "1"})
+check(st == 201 and [m["date"] for m in created] == ["2027-02-02", "2027-02-09", "2027-02-23"]
+      and all(m["time"] == "18:00" and m["starts_at"].startswith(m["date"] + "T17:00") for m in created),
+      "planera veckoserie med överhoppat lov, svensk tid → UTC")
+mid = created[0]["id"]
+st, md, _ = call(leader, "GET", f"/v1/meetings/{mid}")
+entries = [{"person_id": r["id"], "status": "present"} for r in md["roster"]]
+entries[0]["status"] = "excused"
+st, saved, _ = call(leader, "PUT", f"/v1/meetings/{mid}/attendance", {"entries": entries}, {"x-sn-csrf": "1"})
+check(st == 200 and saved["meeting"]["present"] == len(entries) - 1 and saved["meeting"]["excused"] == 1,
+      f"registrera närvaro: {saved['meeting']['present']} närvarande, 1 förhinder")
+st, again, _ = call(leader, "PUT", f"/v1/meetings/{mid}/attendance", {"entries": entries[:2]}, {"x-sn-csrf": "1"})
+check(st == 200 and again["meeting"]["present"] + again["meeting"]["excused"] == 2, "helhetsuppdatering ersätter närvaron")
+check(call(leader, "PUT", f"/v1/meetings/{mid}/attendance",
+           {"entries": [{"person_id": "00000000-0000-0000-0000-000000000000", "status": "present"}]}, {"x-sn-csrf": "1"})[0] == 400,
+      "person utanför avdelningen ger 400")
+check(all(call(leader, "DELETE", f"/v1/meetings/{m['id']}", None, {"x-sn-csrf": "1"})[0] == 204 for m in created)
+      and call(leader, "GET", f"/v1/meetings/{mid}")[0] == 404, "ta bort planerade möten")
+st, summ, _ = call(reg, "GET", f"/v1/bodies/{key}/attendance/summary")
+check(st == 200 and len(summ["troops"]) >= 4 and any(t["held"] > 0 for t in summ["troops"]),
+      f"närvaroöversikt för kåren: {len(summ['troops'])} avdelningar")
+check(call(reg, "PUT", f"/v1/meetings/{past[-1]['id']}/attendance", {"entries": []}, {"x-sn-csrf": "1"})[0] == 403,
+      "medlemsregistrerare kan läsa men inte registrera närvaro (403)")
+other_troop = next(t for t in summ["troops"] if t["troop"]["number"] != troop_ctx["body_number"])
+check(call(leader, "GET", f"/v1/bodies/troop-{other_troop['troop']['number']}/attendance")[0] == 404
+      and call(leader, "GET", f"/v1/meetings/{other_troop['last_meeting_id']}")[0] == 404,
+      "avdelningsledare ser inte andra avdelningars närvaro")
+
 scout = login("Scout")
 st, sme, _ = call(scout, "GET", "/v1/me")
 check(st == 200 and not sme["contexts"], "scout utan roll har inga kontexter")

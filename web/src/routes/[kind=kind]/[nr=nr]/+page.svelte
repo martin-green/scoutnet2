@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { api, permissionLabels, type BodyChild } from '#lib/api/client.ts';
+	import { api, fmtWhen, permissionLabels, type AttendanceSummary, type BodyChild } from '#lib/api/client.ts';
 	import { bodyHref, kindPlural } from '#lib/bodies.ts';
 	import type { PageProps } from './$types';
 
@@ -7,17 +7,29 @@
 	const body = $derived(data.body);
 
 	let children = $state<BodyChild[]>([]);
+	let attendance = $state<AttendanceSummary | null>(null);
 	$effect(() => {
 		const id = body.id;
+		const canAttendance = body.permissions.includes('attendance_read') && ['troop', 'group'].includes(body.kind);
 		let current = true;
 		children = [];
+		attendance = null;
 		api.children(id)
 			.then((c) => {
 				if (current) children = c;
 			})
 			.catch(() => (children = []));
+		if (canAttendance) {
+			api.attendanceSummary(id)
+				.then((s) => {
+					if (current) attendance = s;
+				})
+				.catch(() => (attendance = null));
+		}
 		return () => (current = false);
 	});
+	const troopAttendance = $derived(body.kind === 'troop' ? attendance?.troops[0] : undefined);
+	const missingAttendance = $derived(attendance?.troops.reduce((s, t) => s + t.missing_attendance, 0) ?? 0);
 
 	const weekdays = ['', 'måndagar', 'tisdagar', 'onsdagar', 'torsdagar', 'fredagar', 'lördagar', 'söndagar'];
 	const childHeading = $derived(
@@ -59,6 +71,34 @@
 		</div>
 	{/if}
 </section>
+
+{#if troopAttendance}
+	{@const t = troopAttendance}
+	<section class="card attendance">
+		<div>
+			<h2>Närvaro {attendance?.term}</h2>
+			<p class="muted">
+				{t.held} av {t.planned} möten genomförda{t.attendance_pct != null ? ` · snittnärvaro ${Math.round(t.attendance_pct * 100)} %` : ''}
+			</p>
+		</div>
+		<div class="att-actions">
+			{#if t.last_meeting_id && t.last_meeting && t.last_meeting_recorded === 0}
+				<a class="btn primary" href={`${bodyHref(body, 'narvaro')}/${t.last_meeting_id}`}>✅ Registrera närvaro – {fmtWhen(t.last_meeting)}</a>
+			{:else if t.next_meeting_id && t.next_meeting}
+				<a class="btn primary" href={`${bodyHref(body, 'narvaro')}/${t.next_meeting_id}`}>✅ Nästa möte – {fmtWhen(t.next_meeting)}</a>
+			{/if}
+			<a class="btn" href={bodyHref(body, 'narvaro')}>Närvarolista</a>
+		</div>
+	</section>
+{:else if attendance && missingAttendance > 0}
+	<section class="card attendance">
+		<div>
+			<h2>Att göra</h2>
+			<p><span class="badge red">{missingAttendance} {missingAttendance === 1 ? 'möte saknar' : 'möten saknar'} närvaro</span> i kårens avdelningar {attendance.term}.</p>
+		</div>
+		<div class="att-actions"><a class="btn" href={bodyHref(body, 'narvaro')}>Visa närvaro</a></div>
+	</section>
+{/if}
 
 {#if children.length > 0}
 	<section>
@@ -148,5 +188,22 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: 6px;
+	}
+	.attendance {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		gap: var(--space-3);
+		flex-wrap: wrap;
+		margin-bottom: var(--space-5);
+	}
+	.attendance h2,
+	.attendance p {
+		margin: 0 0 4px;
+	}
+	.att-actions {
+		display: flex;
+		gap: var(--space-2);
+		flex-wrap: wrap;
 	}
 </style>

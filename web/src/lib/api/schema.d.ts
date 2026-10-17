@@ -72,6 +72,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/bodies/{id}/attendance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Närvarolistan för en avdelning: terminens möten som kolumner och deltagare som rader. */
+        get: operations["attendance_matrix"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/bodies/{id}/attendance/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Närvaro per avdelning under en enhet (kår, distrikt …) för en termin. */
+        get: operations["attendance_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/bodies/{id}/children": {
         parameters: {
             query?: never;
@@ -109,6 +143,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/bodies/{id}/meetings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Planerar ett möte eller en veckoserie för avdelningen. Kräver `attendance_write`. */
+        post: operations["create_meetings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/bodies/{id}/members": {
         parameters: {
             query?: never;
@@ -136,6 +187,42 @@ export interface paths {
         /** Inloggad användare, roller och arbetskontexter. */
         get: operations["me"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/meetings/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ett möte med deltagarlista och registrerad närvaro. */
+        get: operations["get_meeting"];
+        put?: never;
+        post?: never;
+        /** Tar bort ett möte och dess närvaro. Kräver `attendance_write`. Låsta möten kan inte tas bort. */
+        delete: operations["delete_meeting"];
+        options?: never;
+        head?: never;
+        /** Ändrar ett möte (t.ex. flyttar det). Kräver `attendance_write`. */
+        patch: operations["update_meeting"];
+        trace?: never;
+    };
+    "/v1/meetings/{id}/attendance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Sparar närvaron för ett möte. Kräver `attendance_write`. Låsta (rapporterade) möten ger 409. */
+        put: operations["put_attendance"];
         post?: never;
         delete?: never;
         options?: never;
@@ -197,12 +284,53 @@ export interface components {
             /** Format: date */
             valid_to?: string | null;
         };
+        AttendanceEntry: {
+            /** Format: uuid */
+            person_id: string;
+            /** @description `present`, `absent` eller `excused`. */
+            status: string;
+        };
+        AttendanceMatrix: {
+            /** @description Om den inloggade får planera möten och registrera närvaro. */
+            can_write: boolean;
+            meetings: components["schemas"]["MeetingDto"][];
+            people: components["schemas"]["AttendanceRow"][];
+            term: string;
+            /** Format: int32 */
+            term_id: number;
+            troop: components["schemas"]["BodyRef"];
+        };
+        AttendanceRow: {
+            /** Format: int32 */
+            age: number;
+            first_name: string;
+            /** Format: int64 */
+            hikes: number;
+            /** Format: uuid */
+            id: string;
+            is_leader: boolean;
+            last_name: string;
+            patrol?: string | null;
+            /** Format: int64 */
+            present: number;
+            /**
+             * Format: int64
+             * @description Genomförda möten med registrerad närvaro för personen.
+             */
+            recorded: number;
+            /** @description En status per möte i `meetings` (samma ordning): `present`, `absent`, `excused` eller `null`. */
+            statuses: (string | null)[];
+        };
         AttendanceSummary: {
             /** Format: int64 */
             present: number;
             term: string;
             /** Format: int64 */
             total: number;
+        };
+        AttendanceUpdate: {
+            /** @description Hela närvaron för mötet. Personer som inte finns med tas bort (idempotent helhetsuppdatering). */
+            entries: components["schemas"]["AttendanceEntry"][];
         };
         BodyChildDto: {
             /** Format: int64 */
@@ -293,6 +421,29 @@ export interface components {
             permissions: components["schemas"]["Permission"][];
             roles: string[];
         };
+        CreateMeetings: {
+            /**
+             * Format: date
+             * @description Första mötets datum.
+             */
+            date: string;
+            /** Format: int32 */
+            duration_min: number;
+            /** @description `meeting` (standard), `hike`, `camp`, `activity`. */
+            kind?: string | null;
+            location?: string | null;
+            /** @description Namn. För en serie läggs veckonumret till, t.ex. "Möte v.43". */
+            name: string;
+            /**
+             * Format: date
+             * @description Upprepa varje vecka till och med detta datum.
+             */
+            repeat_until?: string | null;
+            /** @description Datum i serien som hoppas över (lov, helgdagar). */
+            skip_dates?: string[];
+            /** @description Starttid `HH:MM` (svensk tid). */
+            time: string;
+        };
         /** @description En överliggande enhet i brödsmulorna. */
         CrumbDto: {
             /** @description Om den inloggade får öppna enheten. Annars visas bara namnet. */
@@ -361,6 +512,47 @@ export interface components {
             /** Format: uuid */
             person_id: string;
             roles: components["schemas"]["RoleGrantDto"][];
+        };
+        MeetingDetail: {
+            can_write: boolean;
+            meeting: components["schemas"]["MeetingDto"];
+            /** Format: uuid */
+            next_id?: string | null;
+            /**
+             * Format: uuid
+             * @description Föregående och nästa möte i samma avdelning, för bläddring.
+             */
+            previous_id?: string | null;
+            roster: components["schemas"]["RosterEntry"][];
+        };
+        MeetingDto: {
+            /** Format: int64 */
+            absent: number;
+            /**
+             * Format: date
+             * @description Lokalt datum (Europe/Stockholm).
+             */
+            date: string;
+            /** Format: int32 */
+            duration_min: number;
+            /** Format: int64 */
+            excused: number;
+            /** Format: uuid */
+            id: string;
+            is_past: boolean;
+            /** @description `meeting`, `hike`, `camp`, `activity`. */
+            kind: string;
+            location?: string | null;
+            /** @description Rapporterat (t.ex. i DAK) och därför låst för ändringar. */
+            locked: boolean;
+            name: string;
+            /** Format: int64 */
+            present: number;
+            /** Format: date-time */
+            starts_at: string;
+            /** @description Lokal starttid `HH:MM`. */
+            time: string;
+            troop: components["schemas"]["BodyRef"];
         };
         MeetingInfo: {
             /** Format: int32 */
@@ -672,6 +864,26 @@ export interface components {
              */
             to?: string | null;
         };
+        RosterEntry: {
+            /** Format: int32 */
+            age: number;
+            first_name: string;
+            /** Format: uuid */
+            id: string;
+            is_leader: boolean;
+            last_name: string;
+            patrol?: string | null;
+            /** @description Placerad i avdelningen på mötesdagen. `false` för gäster och personer som har flyttat. */
+            placed: boolean;
+            /** @description `present`, `absent`, `excused` eller `null` (inte registrerad). */
+            status?: string | null;
+        };
+        TermAttendanceSummary: {
+            term: string;
+            /** Format: int32 */
+            term_id: number;
+            troops: components["schemas"]["TroopAttendanceSummary"][];
+        };
         TermFeeDto: {
             /**
              * Format: int32
@@ -692,12 +904,61 @@ export interface components {
             /** Format: int32 */
             term_id: number;
         };
+        TroopAttendanceSummary: {
+            /**
+             * Format: double
+             * @description Andel närvarande av registrerade (0–1).
+             */
+            attendance_pct?: number | null;
+            /** Format: int64 */
+            held: number;
+            /** Format: date-time */
+            last_meeting?: string | null;
+            /** Format: uuid */
+            last_meeting_id?: string | null;
+            /**
+             * Format: int64
+             * @description Registrerade på senaste mötet (0 = närvaro saknas).
+             */
+            last_meeting_recorded: number;
+            /**
+             * Format: int64
+             * @description Placerade i avdelningen i dag (scouter och ledare).
+             */
+            members: number;
+            /**
+             * Format: int64
+             * @description Genomförda möten där ingen närvaro har registrerats.
+             */
+            missing_attendance: number;
+            /** Format: date-time */
+            next_meeting?: string | null;
+            /** Format: uuid */
+            next_meeting_id?: string | null;
+            /** Format: int64 */
+            planned: number;
+            troop: components["schemas"]["BodyRef"];
+            troop_type?: string | null;
+            troop_type_label?: string | null;
+        };
         TroopRefDto: {
             /** Format: uuid */
             id: string;
             name: string;
             troop_type?: string | null;
             troop_type_label?: string | null;
+        };
+        UpdateMeeting: {
+            /** Format: date */
+            date?: string | null;
+            /** Format: int32 */
+            duration_min?: number | null;
+            kind?: string | null;
+            /** @description Tom sträng tar bort platsen. */
+            location?: string | null;
+            name?: string | null;
+            /** @description `HH:MM`. */
+            time?: string | null;
         };
     };
     responses: never;
@@ -795,6 +1056,80 @@ export interface operations {
             };
         };
     };
+    attendance_matrix: {
+        parameters: {
+            query?: {
+                /** @description Termin, t.ex. `HT2026`, `VT 2027` eller termins-id `20261`. Standard: innevarande termin. */
+                term?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Avdelningens id eller nyckel, t.ex. `troop-5003` */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceMatrix"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    attendance_summary: {
+        parameters: {
+            query?: {
+                /** @description Termin, t.ex. `HT2026`, `VT 2027` eller termins-id `20261`. Standard: innevarande termin. */
+                term?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Enhetens id eller nyckel, t.ex. `group-1001` */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TermAttendanceSummary"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     get_children: {
         parameters: {
             query?: never;
@@ -860,6 +1195,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OrgNodePage"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_meetings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Avdelningens id eller nyckel, t.ex. `troop-5003` */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateMeetings"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingDto"][];
                 };
             };
             400: {
@@ -966,6 +1343,180 @@ export interface operations {
                 };
             };
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    get_meeting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Mötets id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingDetail"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    delete_meeting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Mötets id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    update_meeting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Mötets id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMeeting"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingDetail"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    put_attendance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Mötets id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttendanceUpdate"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeetingDetail"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
