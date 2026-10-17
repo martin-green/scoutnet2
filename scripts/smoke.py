@@ -133,6 +133,26 @@ check(st == 200 and scouts == sorted(scouts, reverse=True) and all(n["path"] == 
       "listvy: avdelningar sorterade på antal scouter")
 check(call(reg, "GET", f"/v1/bodies/{key}/descendants?sort=evil")[0] == 400, "okänd sortering i trädet ger 400")
 
+# Sparade vyer (på servern, delbara i enheten)
+kar = login("Kårordförande")
+st, mine, _ = call(reg, "POST", f"/v1/bodies/{key}/views",
+                   {"list": "members", "name": "Mina spårare", "query": "offset=100&troop_type=sparare&sort=name"},
+                   {"x-sn-csrf": "1"})
+check(st == 201 and mine["query"] == "sort=name&troop_type=sparare" and mine["mine"] and not mine["shared"],
+      "spara egen vy (frågan normaliseras, paginering tas bort)")
+st, shared, _ = call(reg, "POST", f"/v1/bodies/{key}/views",
+                     {"list": "members", "name": "Ledare utan registerutdrag", "query": "leaders=true&police_check=missing,expired",
+                      "shared": True}, {"x-sn-csrf": "1"})
+st, kviews, _ = call(kar, "GET", f"/v1/bodies/{key}/views?list=members")
+check(st == 200 and [v["name"] for v in kviews] == ["Ledare utan registerutdrag"] and not kviews[0]["mine"],
+      "kårordförande ser den delade vyn men inte registrarens egna")
+check(call(kar, "DELETE", f"/v1/views/{mine['id']}", None, {"x-sn-csrf": "1"})[0] == 404,
+      "andras egna vyer går inte att ta bort (404)")
+check(call(leader_probe := login("Avdelningsledare"), "GET", f"/v1/bodies/{key}/views?list=members")[0] == 404,
+      "vyer i en enhet man inte ser är dolda")
+check(all(call(reg, "DELETE", f"/v1/views/{v['id']}", None, {"x-sn-csrf": "1"})[0] == 204 for v in (mine, shared))
+      and call(reg, "GET", f"/v1/bodies/{key}/views?list=members")[1] == [], "ta bort egna vyer")
+
 leader = login("Avdelningsledare")
 st, lme, _ = call(leader, "GET", "/v1/me")
 troop_ctx = next(c for c in lme["contexts"] if c["body_kind"] == "troop")

@@ -16,6 +16,7 @@ export type AttendanceSummary = Schemas['TermAttendanceSummary'];
 export type TroopAttendance = Schemas['TroopAttendanceSummary'];
 export type CreateMeetings = Schemas['CreateMeetings'];
 export type AttendanceStatus = 'present' | 'absent' | 'excused';
+export type SavedView = Schemas['SavedView'];
 export type MemberRow = Schemas['MemberRow'];
 export type MemberPage = Schemas['MemberPage'];
 export type PersonDetail = Schemas['PersonDetail'];
@@ -71,6 +72,9 @@ export const api = {
 		request<MeetingDetail>('PUT', `/v1/meetings/${id}/attendance`, { entries }),
 	updateMeeting: (id: string, body: Schemas['UpdateMeeting']) => request<MeetingDetail>('PATCH', `/v1/meetings/${id}`, body),
 	deleteMeeting: (id: string) => request<void>('DELETE', `/v1/meetings/${id}`),
+	views: (id: string, list: string) => request<SavedView[]>('GET', `/v1/bodies/${id}/views?list=${list}`),
+	createView: (id: string, body: Schemas['CreateView']) => request<SavedView>('POST', `/v1/bodies/${id}/views`, body),
+	deleteView: (id: string) => request<void>('DELETE', `/v1/views/${id}`),
 	revealNationalId: (id: string) =>
 		request<{ national_id: string }>('POST', `/v1/people/${id}/reveal-national-id`),
 	personas: () => request<Persona[]>('GET', '/auth/dev/personas'),

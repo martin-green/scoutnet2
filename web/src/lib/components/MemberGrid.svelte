@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import {
 		api,
+		ApiError,
 		feeStatusLabels,
 		personStatusLabels,
 		policeCheckLabels,
@@ -11,7 +12,8 @@
 		troopTypeLabel,
 		type BodyChild,
 		type MemberPage,
-		type MemberRow
+		type MemberRow,
+		type SavedView
 	} from '#lib/api/client.ts';
 	import PersonPanel from './PersonPanel.svelte';
 
@@ -151,23 +153,53 @@
 		goto(page.url.pathname, { replace: true, reset: false });
 	}
 
-	// Sparade vyer (prototyp: i webbläsaren, i produktion på servern och delbara i kåren).
-	const viewsKey = $derived(`sn2.views.${preset}.${bodyId}`);
-	let views = $state<{ name: string; query: string }[]>([]);
+	// Sparade vyer på servern: egna, och delade med alla som ser listan i enheten.
+	let views = $state<SavedView[]>([]);
+	let showSave = $state(false);
+	let viewName = $state('');
+	let viewShared = $state(false);
+	let viewError = $state<string | null>(null);
 	$effect(() => {
-		views = JSON.parse(localStorage.getItem(viewsKey) ?? '[]');
+		const id = bodyId;
+		const list = preset;
+		let current = true;
+		api.views(id, list)
+			.then((v) => current && (views = v))
+			.catch(() => (views = []));
+		return () => (current = false);
 	});
-	function saveView() {
-		const name = prompt('Namn på vyn', '');
-		if (!name) return;
-		const query = new URLSearchParams(params.toString());
-		query.delete('offset');
-		views = [...views.filter((v) => v.name !== name), { name, query: query.toString() }];
-		localStorage.setItem(viewsKey, JSON.stringify(views));
+	// Samma normalisering som servern gör, så att aktiv vy kan markeras.
+	const normalize = (q: string) =>
+		[...new URLSearchParams(q)]
+			.filter(([k, v]) => v !== '' && k !== 'offset')
+			.map(([k, v]) => `${k}=${v}`)
+			.sort()
+			.join('&');
+	const activeQuery = $derived(normalize(params.toString()));
+	async function saveView(e: SubmitEvent) {
+		e.preventDefault();
+		viewError = null;
+		try {
+			const saved = await api.createView(bodyId, {
+				list: preset,
+				name: viewName.trim(),
+				query: params.toString(),
+				shared: viewShared
+			});
+			views = [...views.filter((v) => v.id !== saved.id && !(v.mine && v.name.toLowerCase() === saved.name.toLowerCase())), saved].sort(
+				(a, b) => Number(a.shared) - Number(b.shared) || a.name.localeCompare(b.name, 'sv')
+			);
+			showSave = false;
+			viewName = '';
+			viewShared = false;
+		} catch (err) {
+			viewError = err instanceof ApiError ? (err.problem?.detail ?? err.message) : String(err);
+		}
 	}
-	function removeView(name: string) {
-		views = views.filter((v) => v.name !== name);
-		localStorage.setItem(viewsKey, JSON.stringify(views));
+	async function removeView(v: SavedView) {
+		if (v.shared && !confirm(`Ta bort den delade vyn "${v.name}" för alla?`)) return;
+		await api.deleteView(v.id);
+		views = views.filter((x) => x.id !== v.id);
 	}
 
 	const limit = $derived(Number(effective.get('limit')));
@@ -223,7 +255,20 @@
 				</div>
 			{/if}
 		</div>
-		<button class="btn" onclick={saveView}>☆ Spara vy</button>
+		<div class="popover-anchor">
+			<button class="btn" onclick={() => (showSave = !showSave)} aria-expanded={showSave}>☆ Spara vy</button>
+			{#if showSave}
+				<form class="popover card save-view" onsubmit={saveView} aria-label="Spara vy">
+					<label>Namn <input class="input" bind:value={viewName} required maxlength="80" placeholder="t.ex. Ledare utan registerutdrag" /></label>
+					<label class="check"><input type="checkbox" bind:checked={viewShared} /> Dela med alla som ser listan här</label>
+					{#if viewError}<p class="error small">{viewError}</p>{/if}
+					<div class="row">
+						<button type="button" class="btn" onclick={() => (showSave = false)}>Avbryt</button>
+						<button class="btn primary">Spara</button>
+					</div>
+				</form>
+			{/if}
+		</div>
 	</div>
 
 	<div class="chips">
@@ -253,10 +298,11 @@
 	{#if views.length > 0}
 		<div class="chips views">
 			<span class="muted">Sparade vyer:</span>
-			{#each views as v (v.name)}
-				<span class="chip">
+			{#each views as v (v.id)}
+				<span class="chip" class:on={activeQuery === normalize(v.query)} title={v.shared ? `Delad av ${v.owner_name}` : 'Bara för dig'}>
+					{#if v.shared}<span aria-label="Delad">👥</span>{/if}
 					<a href={`?${v.query}`}>{v.name}</a>
-					<button class="x" onclick={() => removeView(v.name)} aria-label={`Ta bort vyn ${v.name}`}>×</button>
+					{#if v.mine}<button class="x" onclick={() => removeView(v)} aria-label={`Ta bort vyn ${v.name}`}>×</button>{/if}
 				</span>
 			{/each}
 		</div>
@@ -418,6 +464,32 @@
 	}
 	.views a {
 		color: inherit;
+	}
+	.save-view {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+		width: 300px;
+	}
+	.save-view label {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		font-size: 0.88rem;
+	}
+	.save-view label.check {
+		flex-direction: row;
+		align-items: center;
+		gap: 6px;
+	}
+	.save-view .row {
+		display: flex;
+		justify-content: flex-end;
+		gap: var(--space-2);
+	}
+	.save-view .error {
+		color: var(--sn-red);
+		margin: 0;
 	}
 	.x {
 		border: none;

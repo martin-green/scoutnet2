@@ -234,6 +234,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/bodies/{id}/views": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Egna och delade vyer för en lista i enheten. */
+        get: operations["list_views"];
+        put?: never;
+        /** Sparar en vy. Finns redan en egen vy med samma namn ersätts den. */
+        post: operations["create_view"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me": {
         parameters: {
             query?: never;
@@ -316,6 +334,23 @@ export interface paths {
         /** Visar hela personnumret. Kräver behörigheten `national_id_read` och färsk inloggning (step-up). Loggas alltid. */
         post: operations["reveal_national_id"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/views/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Tar bort en egen vy. Delade vyer kan även tas bort av den som får hantera medlemmar i enheten. */
+        delete: operations["delete_view"];
         options?: never;
         head?: never;
         patch?: never;
@@ -506,6 +541,13 @@ export interface components {
             skip_dates?: string[];
             /** @description Starttid `HH:MM` (svensk tid). */
             time: string;
+        };
+        CreateView: {
+            list: string;
+            name: string;
+            query: string;
+            /** @description Dela med alla som ser listan i enheten. */
+            shared?: boolean;
         };
         /** @description En överliggande enhet i brödsmulorna. */
         CrumbDto: {
@@ -944,6 +986,21 @@ export interface components {
             placed: boolean;
             /** @description `present`, `absent`, `excused` eller `null` (inte registrerad). */
             status?: string | null;
+        };
+        SavedView: {
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            /** @description `members`, `waiting` eller `organisation`. */
+            list: string;
+            /** @description Om den inloggade äger vyn (och därmed kan ta bort den). */
+            mine: boolean;
+            name: string;
+            owner_name: string;
+            /** @description Frågan som i adressfältet, t.ex. `troop_type=sparare&sort=-birth_date`. */
+            query: string;
+            shared: boolean;
         };
         TermAttendanceSummary: {
             term: string;
@@ -1456,6 +1513,81 @@ export interface operations {
             };
         };
     };
+    list_views: {
+        parameters: {
+            query: {
+                /** @description `members`, `waiting` eller `organisation`. */
+                list: string;
+            };
+            header?: never;
+            path: {
+                /** @description Enhetens id eller nyckel, t.ex. `group-1001` */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedView"][];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_view: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Enhetens id eller nyckel */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateView"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedView"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     me: {
         parameters: {
             query?: never;
@@ -1708,6 +1840,42 @@ export interface operations {
                 };
             };
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    delete_view: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Vyns id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

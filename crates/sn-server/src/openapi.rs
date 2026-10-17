@@ -30,6 +30,9 @@ use crate::{auth, routes};
         routes::attendance::update_meeting,
         routes::attendance::delete_meeting,
         routes::attendance::put_attendance,
+        routes::views::list_views,
+        routes::views::create_view,
+        routes::views::delete_view,
         auth::dev_personas,
         auth::dev_login,
         auth::logout,
@@ -42,6 +45,7 @@ use crate::{auth, routes};
         (name = "organisation", description = "Organisationsträdet"),
         (name = "members", description = "Medlemmar och personer"),
         (name = "attendance", description = "Möten och närvaro"),
+        (name = "views", description = "Sparade vyer"),
         (name = "auth", description = "Inloggning och sessioner"),
     ),
     modifiers(&SessionCookie)

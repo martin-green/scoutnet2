@@ -10,6 +10,7 @@ pub mod bodies;
 pub mod me;
 pub mod members;
 pub mod people;
+pub mod views;
 
 /// Kort referens till en enhet. `kind` och `number` bildar den läsbara nyckeln `kind-number`
 /// (t.ex. `group-1001`), som kan användas i stället för `id` i alla `/v1/bodies/{id}`-anrop.
@@ -28,6 +29,7 @@ pub fn router() -> Router<AppState> {
         .merge(members::router())
         .merge(people::router())
         .merge(attendance::router())
+        .merge(views::router())
 }
 
 /// Registrerar en händelse i revisionsloggen. Fel här får inte stoppa läsningen,
