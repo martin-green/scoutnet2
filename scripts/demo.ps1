@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Startar demomiljön för Scoutnet 2-prototypen på en dator.
 
