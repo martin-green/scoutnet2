@@ -1,0 +1,229 @@
+/* Scoutnet 2 – designsystem (prototyp). Tokens först, komponenter använder bara tokens. */
+:root {
+	--sn-blue-900: #002445;
+	/* Scouternas officiella blå (grafisk profil) */
+	--sn-blue-800: #003660;
+	--sn-blue-600: #00509e;
+	--sn-blue-500: #1868b7;
+	--sn-blue-100: #dbe8f6;
+	--sn-blue-50: #eef4fb;
+	--sn-accent: #f2a900;
+	--sn-accent-50: #fff6dc;
+	--sn-green: #2e7d32;
+	--sn-green-50: #e8f5e9;
+	--sn-red: #b3261e;
+	--sn-red-50: #fdecea;
+	--sn-gray-900: #1d2329;
+	--sn-gray-700: #3d4852;
+	--sn-gray-500: #6b7785;
+	--sn-gray-300: #c9d1da;
+	--sn-gray-200: #e1e6ec;
+	--sn-gray-100: #f1f4f7;
+	--sn-white: #ffffff;
+
+	--bg: var(--sn-gray-100);
+	--surface: var(--sn-white);
+	--text: var(--sn-gray-900);
+	--muted: var(--sn-gray-500);
+	--border: var(--sn-gray-200);
+	--primary: var(--sn-blue-600);
+	--primary-strong: var(--sn-blue-800);
+	--badge-gray-text: var(--sn-gray-700);
+	--badge-accent-text: #7a5300;
+	--badge-green-text: var(--sn-green);
+	--badge-red-text: var(--sn-red);
+
+	--radius: 10px;
+	--radius-sm: 6px;
+	--shadow: 0 1px 2px rgb(0 0 0 / 6%), 0 4px 16px rgb(0 0 0 / 6%);
+	--space-1: 4px;
+	--space-2: 8px;
+	--space-3: 12px;
+	--space-4: 16px;
+	--space-5: 24px;
+	--space-6: 32px;
+	--font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+	--mono: ui-monospace, 'Cascadia Code', 'SF Mono', monospace;
+	color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg: #0f1419;
+		--surface: #182029;
+		--text: #e6edf3;
+		--muted: #93a1af;
+		--border: #2a3540;
+		--primary: #5aa2e8;
+		--primary-strong: #8fc1f2;
+		--sn-blue-50: #16263a;
+		--sn-blue-100: #1d3550;
+		--sn-accent-50: #3a2f10;
+		--sn-green-50: #13301a;
+		--sn-red-50: #3a1714;
+		--sn-gray-100: #121a21;
+		--sn-gray-200: #26313c;
+		--badge-gray-text: #b8c4cf;
+		--badge-accent-text: #ffd36b;
+		--badge-green-text: #8fd694;
+		--badge-red-text: #ff9b92;
+		--shadow: 0 1px 2px rgb(0 0 0 / 30%), 0 4px 16px rgb(0 0 0 / 30%);
+		color-scheme: dark;
+	}
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--text);
+	font-family: var(--font);
+	font-size: 15px;
+	line-height: 1.45;
+}
+
+a {
+	color: var(--primary);
+	text-decoration: none;
+}
+a:hover {
+	text-decoration: underline;
+}
+
+h1,
+h2,
+h3 {
+	margin: 0 0 var(--space-3);
+	line-height: 1.2;
+}
+h1 {
+	font-size: 1.6rem;
+}
+h2 {
+	font-size: 1.15rem;
+}
+
+button,
+input,
+select {
+	font: inherit;
+	color: inherit;
+}
+
+.btn {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--space-2);
+	padding: 7px 14px;
+	border-radius: var(--radius-sm);
+	border: 1px solid var(--border);
+	background: var(--surface);
+	cursor: pointer;
+	white-space: nowrap;
+}
+.btn:hover {
+	border-color: var(--primary);
+}
+.btn.primary {
+	background: var(--primary);
+	color: #fff;
+	border-color: var(--primary);
+}
+.btn.primary:hover {
+	background: var(--primary-strong);
+}
+.btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+.btn.ghost {
+	border-color: transparent;
+	background: transparent;
+}
+
+.input {
+	padding: 7px 10px;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-sm);
+	background: var(--surface);
+	min-width: 0;
+}
+.input:focus,
+.btn:focus-visible,
+a:focus-visible {
+	outline: 2px solid var(--sn-accent);
+	outline-offset: 1px;
+}
+
+.card {
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	box-shadow: var(--shadow);
+	padding: var(--space-4);
+}
+
+.chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 10px;
+	border-radius: 999px;
+	border: 1px solid var(--border);
+	background: var(--surface);
+	cursor: pointer;
+	font-size: 0.875rem;
+	user-select: none;
+}
+.chip.on {
+	background: var(--sn-blue-50);
+	border-color: var(--primary);
+	color: var(--primary-strong);
+	font-weight: 600;
+}
+
+.badge {
+	display: inline-block;
+	padding: 1px 8px;
+	border-radius: 999px;
+	font-size: 0.78rem;
+	font-weight: 600;
+	background: var(--sn-gray-100);
+	color: var(--badge-gray-text);
+	white-space: nowrap;
+}
+.badge.blue {
+	background: var(--sn-blue-50);
+	color: var(--primary-strong);
+}
+.badge.accent {
+	background: var(--sn-accent-50);
+	color: var(--badge-accent-text);
+}
+.badge.green {
+	background: var(--sn-green-50);
+	color: var(--badge-green-text);
+}
+.badge.red {
+	background: var(--sn-red-50);
+	color: var(--badge-red-text);
+}
+
+.muted {
+	color: var(--muted);
+}
+.mono {
+	font-family: var(--mono);
+	font-size: 0.9em;
+}
+.sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+}

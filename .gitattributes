@@ -1,0 +1,7 @@
+# Alla textfiler lagras med LF i repot, oberoende av plattform.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary

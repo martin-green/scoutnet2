@@ -1,0 +1,18 @@
+# Inloggningsuppgifter och hemligheter – checka aldrig in
+custard.no.access.txt
+*.access.txt
+.env
+.env.*
+!.env.example
+
+# Konfidentiellt (t.ex. säkerhetsobservationer om andra system före ansvarsfullt avslöjande)
+docs/private/
+
+# Rust
+/target/
+
+# Node / frontend
+node_modules/
+
+# Lokala källfiler för varumärket (de som används ligger i web/static/brand/)
+/grafiskprofil/
