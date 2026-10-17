@@ -17,7 +17,7 @@ Alla lösenord nedan är `scout`. **Endast syntetiska testkonton.** Inga riktiga
 | 9000118 | Alma Andersson | Förbundsadministratör |
 | 9000078 | Theo Hansson | Ledare, Björnarna |
 | 9000080 | Ella Sandberg | Scout (utmanare) |
-| 9002549 | Eva Gustafsson | Vårdnadshavare |
+| 9990001 | (varierar med seedens datum) | Vårdnadshavare med konto, kopplad till en spårare. Fast medlemsnummer. |
 | 9000041 | Emma Gustafsson | Scout utan konto i förväg: kontot skapas vid första inloggningen |
 | 9999999 | Okänd Testperson | Finns inte i Scoutnet 2: inloggningen nekas med ett begripligt meddelande |
 

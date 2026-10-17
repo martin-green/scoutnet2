@@ -163,12 +163,12 @@
       ]
     },
     {
-      "username": "9002549",
+      "username": "9990001",
       "enabled": true,
-      "email": "eva.gustafsson.9002549@example.org",
+      "email": "vardnadshavare.9990001@example.org",
       "emailVerified": true,
-      "firstName": "Eva",
-      "lastName": "Gustafsson",
+      "firstName": "Vårdnadshavare",
+      "lastName": "Demo",
       "credentials": [
         {
           "type": "password",

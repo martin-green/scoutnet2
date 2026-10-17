@@ -132,6 +132,10 @@ st, lst, _ = call(reg, "GET", f"/v1/bodies/{key}/descendants?kind=troop&sort=-sc
 scouts = [n["counts"]["scouts"] for n in lst["items"]]
 check(st == 200 and scouts == sorted(scouts, reverse=True) and all(n["path"] == [] for n in lst["items"]),
       "listvy: avdelningar sorterade på antal scouter")
+st, kids, _ = call(reg, "GET", f"/v1/bodies/{key}/children")
+check(st == 200 and sum(c["active"] for c in kids) == body["counts"]["active"]
+      and sum(c["leaders"] for c in kids) == body["counts"]["leaders"],
+      f"underenheter: {len(kids)} st, summan stämmer med kåren")
 check(call(reg, "GET", f"/v1/bodies/{key}/descendants?sort=evil")[0] == 400, "okänd sortering i trädet ger 400")
 
 # Sparade vyer (på servern, delbara i enheten)

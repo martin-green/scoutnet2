@@ -32,6 +32,8 @@ Följande ingår inte: fakturering och betalningar (terminsavgifternas status vi
 | 2 | **Inloggning via ScoutID** (OIDC authorization code + PKCE, BFF) mot en lokal Keycloak med realmen `scoutid` som efterliknar nya ScoutID. Kontot kopplas via `sub` och första gången via `scoutnet_member_no`. `auth_time` och `acr` från ScoutID styr step-up. Utloggning även i ScoutID. Okänt ScoutID ger ett begripligt meddelande, och medlemmar utan konto får ett vid första inloggningen. **Sparade vyer på servern**, egna eller delade med alla som ser listan i enheten. Lokal git med första commits. |
 | 3 | **Närvaro:** terminsplanering (veckoserier med överhoppade lov, svensk tid), närvarolista per avdelning och termin (matris), registrering i mobilen med ett tryck per scout och autosparning, förhinder, ändra och ta bort möten, översikt per kår med "möten som saknar närvaro" och genväg från översikten. Läs- och skrivbehörighet skiljs åt (registrerare läser, ledare registrerar). |
 | 4 | **Bidrag:** Göteborgs regler för aktivitetsbidrag 2026 som data. Varje sammankomst kontrolleras (ålder, deltagare, ledare, längd) med förklaring, och bidraget beräknas per kår och avdelning. **DAK 2.2-export** per avdelning, med samma struktur som Skojjt, kräver behörighet att se personnummer och färsk inloggning. **iCal-prenumeration** med återkallbar token utan personuppgifter. Rökprov med 69 kontroller. |
+| 5 | **Massåtgärder:** markera i medlemslistan eller väntelistan (shift-klick för intervall) och flytta till en avdelning eller patrull, eller ta in från väntelistan. Förhandsgranskning per rad innan något ändras. **Vem har sett mina uppgifter:** varje medlem ser i Min profil vem som har öppnat personkortet, visat personnumret, flyttat personen eller hämtat uppgifterna via en integration. Kårordförande ser samma logg i personkortet. **Integrationer:** API-nycklar per kår med behörigheter (kontaktuppgifter och personnummer var för sig) och `GET /api/group/memberlist` i Scoutnets format, så att Skojjt och andra integrationer kan byta adress utan omskrivning. Rökprov med 90 kontroller. |
+| 6 | **Prestanda med 100 000 personer:** alla mätta anrop har p95 under 250 ms, och allt på kår- och avdelningsnivå under 50 ms ([mätresultat](./05-prestanda.md)). Läsmodellen `current_placement` (aktuell avdelning och patrull, uppdateras av triggers) ersätter två uppslag per person. Filter på en enhet kan nu använda index, och listor över hela förbundet räknar bara fram tunga fält för sidans rader. Den gamla frågan tog 1,9 s för en kår med 119 medlemmar, den nya tar 20 ms. |
 
 ## Demo-manus (utkast)
 
@@ -44,8 +46,11 @@ Följande ingår inte: fakturering och betalningar (terminsavgifternas status vi
 | 3c | Som **distriktsordförande**: *Organisation* → "Visa ned till avdelningar", sedan *Lista* → alla spåraravdelningar i distriktet sorterade på antal scouter. Klicka vidare via brödsmulorna. | Överblick över många enheter, läsbara och delbara adresser |
 | 4 | Mobil: från översikten "Registrera närvaro", tryck på scouterna, klart (sparas automatiskt). Planera vårterminen med lovveckor överhoppade. Prenumerera på mötena i kalendern. | Närvaro, mobil, iCal |
 | 5 | Som **medlemsregistrerare**: *Bidrag* för kåren, se varför Familjescouterna får underkända sammankomster, ladda ner DAK-filen | Bidragsregler som data, DAK |
+| 5b | Som **medlemsregistrerare**: *Väntelista*, markera de tre som väntat längst, *Ta in i avdelning* → Spårhundarna. Förhandsgranskningen visar vad som händer, sedan genomför. | Massåtgärder med torrkörning, i stället för en person i taget |
+| 5c | *Integrationer*: skapa en nyckel för "Skojjt närvaro" med kontaktuppgifter, kör `curl` med nyckeln och visa att svaret har samma format som dagens Scoutnet. Återkalla nyckeln. | Befintliga integrationer kan flytta utan omskrivning, och nycklar har behörigheter |
+| 5d | Logga in som **scouten** (9000080): *Min profil* → "Vem har sett mina uppgifter" visar registrarens visning och integrationens hämtning med namn | Insyn för medlemmen (GDPR), revisionslogg |
 | 6 | Öppna `/docs` och kör samma anrop via API:t | API först |
-| 7 | Prestanda: 100 000 syntetiska personer och p95 i loggen | Skalbarhet |
+| 7 | Prestanda: kör `python scripts/perf.py` mot 100 000 syntetiska personer. Som **förbundsadministratör**: hela förbundets medlemslista, sök på namn och organisationsträdet. | Skalbarhet: kår under 25 ms, hela förbundet 120–200 ms ([mätresultat](./05-prestanda.md)) |
 
 ## Veckoplan
 
@@ -61,7 +66,7 @@ Följande ingår inte: fakturering och betalningar (terminsavgifternas status vi
 ## Teknik i prototypen
 
 - **Backend:** Rust 1.99 (edition 2024), axum, tokio, sqlx (PostgreSQL 18), utoipa (OpenAPI 3.1) och Scalar. Crates: `sn-domain` (rena domäntyper) och `sn-server` (API, behörighet, seed).
-- **Databas:** PostgreSQL 18 i Docker: `ltree` för organisationsträdet, `pg_trgm` för sök och den inbyggda `uuidv7()`.
+- **Databas:** PostgreSQL 18 i Docker: `ltree` för organisationsträdet, `pg_trgm` för sök och den inbyggda `uuidv7()`. Läsmodellen `current_placement` hålls aktuell av triggers. Anslutningarna planerar varje fråga med de verkliga parametrarna (`plan_cache_mode = force_custom_plan`), eftersom samma fråga kan gälla en patrull eller hela förbundet.
 - **Frontend:** SvelteKit (Svelte 5, TypeScript) som SPA, med Vite-proxy mot API:t i utveckling.
 - **Inloggning:** sessionscookie (BFF). OIDC (authorization code + PKCE) mot ScoutID, i utveckling en lokal Keycloak i docker compose ([deploy/keycloak](../deploy/keycloak/README.md)). Personas för snabbinloggning i utvecklingsläge (`SN_DEV_LOGIN=true`).
 

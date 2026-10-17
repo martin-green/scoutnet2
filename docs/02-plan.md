@@ -1057,12 +1057,15 @@ I prototypen är allt samlat i två crates: `sn-domain` (domäntyper) och `sn-se
 | `GET /v1/bodies/{id}/grants?term=` · `GET /v1/bodies/{id}/grants/dak` | Bidragsunderlag mot kommunens regler och DAK 2.2-export (personnummer: step-up, loggas) |
 | `GET/POST /v1/bodies/{id}/views` · `DELETE /v1/views/{id}` | Sparade vyer, egna eller delade i enheten |
 | `POST/DELETE /v1/bodies/{id}/calendar` · `GET /ical/{token}.ics` | Kalenderprenumeration med återkallbar token |
+| `POST /v1/bodies/{id}/bulk` | Massåtgärder i en kår (flytta, ta in från väntelista) med `dry_run` och resultat per rad |
+| `GET/POST /v1/bodies/{id}/api-keys` · `DELETE /v1/api-keys/{id}` | API-nycklar per kår med behörigheter (`memberlist`, `memberlist:contact`, `memberlist:ssno`) |
+| `GET /api/group/memberlist` | Kompatibilitet med dagens Scoutnet (`{value, raw_value}`), HTTP Basic med kårnummer och nyckel |
 | `POST /v1/grant-reports` | Generera bidragsunderlag (regeluppsättning, period, enheter) som asynkront jobb |
 | `GET/POST /v1/events` · `POST /v1/events/{id}/registrations` | Arrangemang och anmälningar |
 | `GET /v1/invoices` · `POST /v1/payments` | Fakturor och betalningar |
 | `POST /v1/exports` · `GET /v1/jobs/{id}` | Export och jobbstatus |
 | `GET /v1/events-feed?after=` · `POST /v1/webhooks` | Händelseflöde och webhooks |
-| `GET /v1/audit-events?subject=person:{id}` | "Vem har sett eller ändrat mina uppgifter?" (för den registrerade och för dataskyddsombudet) |
+| `GET /v1/people/{id}/audit` | "Vem har sett eller ändrat mina uppgifter?" för personen själv, vårdnadshavare och den som har `audit_read` (i prototypen). Senare även `GET /v1/audit-events?subject=person:{id}` för dataskyddsombudet. |
 
 ## Bilaga C – Exempel på behörighetspolicy (Cedar)
 

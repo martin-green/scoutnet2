@@ -1,6 +1,6 @@
 use anyhow::Context;
 use sn_server::{AppState, Config, MIGRATOR, app};
-use sqlx::postgres::PgPoolOptions;
+use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 
@@ -14,9 +14,17 @@ async fn main() -> anyhow::Result<()> {
     if config.dev_login {
         tracing::warn!("SN_DEV_LOGIN är på: snabbinloggning med personas. Får aldrig användas i produktion.");
     }
+    // Samma fråga kan gälla en patrull eller hela förbundet. sqlx återanvänder förberedda frågor,
+    // och en generisk plan för hierarkifilter blir mycket fel för stora enheter. Planera därför
+    // varje körning med de verkliga parametrarna (kostar 1–5 ms).
+    let options = config
+        .database_url
+        .parse::<PgConnectOptions>()
+        .context("ogiltig DATABASE_URL")?
+        .options([("plan_cache_mode", "force_custom_plan")]);
     let db = PgPoolOptions::new()
         .max_connections(20)
-        .connect(&config.database_url)
+        .connect_with(options)
         .await
         .context("kunde inte ansluta till databasen")?;
     MIGRATOR.run(&db).await.context("migrering misslyckades")?;

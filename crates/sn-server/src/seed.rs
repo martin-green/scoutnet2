@@ -179,6 +179,8 @@ const LAST: &[&str] = &[
     "Yilmaz",
     "Virtanen",
 ];
+/// Vårdnadshavarpersonans medlemsnummer (se `deploy/keycloak/README.md`).
+const GUARDIAN_PERSONA_NO: i32 = 9_990_001;
 const DISTRICTS: &[(&str, &str)] = &[
     ("Älvstadens scoutdistrikt", "Göteborg"),
     ("Sjöstadens scoutdistrikt", "Stockholm"),
@@ -1344,6 +1346,12 @@ fn generate(cfg: &SeedConfig) -> Gen {
             let city = g.persons[scouts[0]].city;
             let last = g.persons[scouts[0]].last.clone();
             let parent = g.add_person_between(32, 48, city, Some(&last));
+            // Fast medlemsnummer utanför det genererade intervallet, så att testanvändaren i
+            // Keycloak (deploy/keycloak) pekar på samma person oavsett hur många som genereras.
+            let p = &mut g.persons[parent];
+            p.member_no = GUARDIAN_PERSONA_NO;
+            p.email =
+                Some(format!("{}.{}.{GUARDIAN_PERSONA_NO}@example.org", ascii_slug(&p.first), ascii_slug(&p.last)));
             for &child in &scouts[..1] {
                 let child_id = g.persons[child].id;
                 if let Some(gu) = g.guardians.iter_mut().find(|gu| gu.child == child_id) {

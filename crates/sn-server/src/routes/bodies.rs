@@ -233,6 +233,37 @@ pub async fn load_visible_body(
     }
 }
 
+/// Kårnivån som ett filter på en enhets sökväg kan börja från (se `group_scope` i migration 0009).
+/// Skickas som parameter, så att Postgres planerar med det verkliga värdet: en kår ger ett
+/// indexuppslag, hela förbundet hash-joinar.
+pub async fn group_scope(state: &AppState, path: &str) -> ApiResult<String> {
+    Ok(sqlx::query_scalar("SELECT group_scope($1::ltree)::text").bind(path).fetch_one(&state.db).await?)
+}
+
+/// Antal medlemmar per placering (sökväg) under `path`, med kolumnerna `p`, `scouts`, `leaders`,
+/// `waiting` och `pending`. Räknar på id via `current_placement` och slår upp sökvägarna sist,
+/// i stället för att gå igenom `member_current` person för person.
+fn push_member_counts(qb: &mut QueryBuilder<Postgres>, path: &str, scope: &str) {
+    qb.push(
+        "SELECT coalesce(pa.path, t.path, g.path) AS p, sum(a.scouts)::int8 AS scouts, sum(a.leaders)::int8 AS leaders,
+                sum(a.waiting)::int8 AS waiting, sum(a.pending)::int8 AS pending
+         FROM (SELECT m.group_id, cp.troop_id, cp.patrol_id,
+                      count(*) FILTER (WHERE m.status = 'active' AND NOT coalesce(cp.is_leader, false)) AS scouts,
+                      count(*) FILTER (WHERE m.status = 'active' AND coalesce(cp.is_leader, false)) AS leaders,
+                      count(*) FILTER (WHERE m.status = 'waiting') AS waiting,
+                      count(*) FILTER (WHERE m.status = 'pending') AS pending
+               FROM membership m JOIN body mg ON mg.id = m.group_id
+               LEFT JOIN current_placement cp ON cp.person_id = m.person_id
+               WHERE m.is_primary AND upper_inf(m.valid) AND mg.path <@ ",
+    );
+    qb.push_bind(scope.to_owned()).push(
+        "::ltree GROUP BY 1, 2, 3) a
+         JOIN body g ON g.id = a.group_id LEFT JOIN body t ON t.id = a.troop_id LEFT JOIN body pa ON pa.id = a.patrol_id
+         WHERE coalesce(pa.path, t.path, g.path) <@ ",
+    );
+    qb.push_bind(path.to_owned()).push("::ltree GROUP BY 1");
+}
+
 /// En enhet i organisationsträdet med nyckeltal och den inloggades behörigheter.
 #[utoipa::path(get, path = "/v1/bodies/{id}", tag = "organisation",
     params(("id" = String, Path, description = "Enhetens id (UUID) eller nyckel `typ-nummer`, t.ex. `group-1001`")),
@@ -270,16 +301,15 @@ pub async fn get_body(
     })
     .collect();
 
-    let counts = sqlx::query_as::<_, BodyCounts>(
-        "SELECT count(*) FILTER (WHERE membership_status = 'active') AS active,
-                count(*) FILTER (WHERE membership_status = 'active' AND is_leader) AS leaders,
-                count(*) FILTER (WHERE membership_status = 'waiting') AS waiting,
-                count(*) FILTER (WHERE membership_status = 'pending') AS pending
-         FROM member_current WHERE effective_path <@ $1::ltree",
-    )
-    .bind(&b.path)
-    .fetch_one(&state.db)
-    .await?;
+    let scope = group_scope(&state, &b.path).await?;
+    let mut qb = QueryBuilder::<Postgres>::new("WITH c AS (");
+    push_member_counts(&mut qb, &b.path, &scope);
+    qb.push(
+        ") SELECT coalesce(sum(scouts + leaders), 0)::int8 AS active, coalesce(sum(leaders), 0)::int8 AS leaders,
+                  coalesce(sum(waiting), 0)::int8 AS waiting, coalesce(sum(pending), 0)::int8 AS pending
+           FROM c",
+    );
+    let counts = qb.build_query_as::<BodyCounts>().fetch_one(&state.db).await?;
 
     let meeting = match (b.meeting_weekday, b.meeting_start, b.meeting_duration_min) {
         (Some(weekday), Some(start), Some(duration_min)) => Some(MeetingInfo {
@@ -318,17 +348,27 @@ pub async fn get_children(
     user: CurrentUser,
     Path(key): Path<String>,
 ) -> ApiResult<Json<Vec<BodyChildDto>>> {
-    let (id, ..) = load_visible_body(&state, &user, &key, Permission::BodyRead).await?;
-    let rows = sqlx::query_as::<_, ChildRow>(
-        "SELECT c.id, c.kind, c.number, c.name, c.troop_type,
-                (SELECT count(*) FROM member_current mc WHERE mc.effective_path <@ c.path AND mc.membership_status = 'active') AS active,
-                (SELECT count(*) FROM member_current mc WHERE mc.effective_path <@ c.path AND mc.membership_status = 'active' AND mc.is_leader) AS leaders
-         FROM body c WHERE c.parent_id = $1 AND c.status = 'active'
-         ORDER BY c.kind, array_position(ARRAY['familj','baver','sparare','upptackare','aventyrare','utmanare','rover','annan'], c.troop_type), c.name",
-    )
-    .bind(id)
-    .fetch_all(&state.db)
-    .await?;
+    let (id, _, path) = load_visible_body(&state, &user, &key, Permission::BodyRead).await?;
+    let scope = group_scope(&state, &path).await?;
+    // Antalen räknas en gång för hela delträdet och summeras per barn (första nivån under enheten).
+    let mut qb = QueryBuilder::<Postgres>::new("WITH c AS (");
+    push_member_counts(&mut qb, &path, &scope);
+    qb.push("), per_child AS (SELECT subpath(c.p, 0, nlevel(")
+        .push_bind(path.clone())
+        .push("::ltree) + 1) AS path, sum(c.scouts + c.leaders)::int8 AS active, sum(c.leaders)::int8 AS leaders FROM c WHERE nlevel(c.p) > nlevel(")
+        .push_bind(path)
+        .push("::ltree) GROUP BY 1)");
+    qb.push(
+        " SELECT ch.id, ch.kind, ch.number, ch.name, ch.troop_type,
+                 coalesce(pc.active, 0)::int8 AS active, coalesce(pc.leaders, 0)::int8 AS leaders
+          FROM body ch LEFT JOIN per_child pc ON pc.path = ch.path
+          WHERE ch.parent_id = ",
+    );
+    qb.push_bind(id).push(
+        " AND ch.status = 'active'
+          ORDER BY ch.kind, array_position(ARRAY['familj','baver','sparare','upptackare','aventyrare','utmanare','rover','annan'], ch.troop_type), ch.name",
+    );
+    let rows: Vec<ChildRow> = qb.build_query_as().fetch_all(&state.db).await?;
     Ok(Json(
         rows.into_iter()
             .map(|c| BodyChildDto {
@@ -381,7 +421,8 @@ pub async fn get_descendants(
     Query(q): Query<DescendantsQuery>,
 ) -> ApiResult<Json<OrgNodePage>> {
     let started = Instant::now();
-    let (root_id, ..) = load_visible_body(&state, &user, &key, Permission::BodyRead).await?;
+    let (_, _, root_path) = load_visible_body(&state, &user, &key, Permission::BodyRead).await?;
+    let scope = group_scope(&state, &root_path).await?;
 
     let kinds = csv_list(q.kind.as_deref());
     validate_in(&kinds, &BodyKind::ALL.map(BodyKind::as_str), "kind")?;
@@ -393,17 +434,11 @@ pub async fn get_descendants(
 
     // Antal per enhet räknas en gång per medlemmens placering och summeras sedan uppåt längs
     // sökvägen (subpath). Det ger en likhetsjoin i stället för en ltree-jämförelse per enhet och medlem.
-    let mut qb = QueryBuilder::<Postgres>::new("WITH root AS (SELECT path FROM body WHERE id = ");
-    qb.push_bind(root_id);
+    let mut qb = QueryBuilder::<Postgres>::new("WITH root AS (SELECT ");
+    qb.push_bind(root_path.clone()).push("::ltree AS path), agg AS (");
+    push_member_counts(&mut qb, &root_path, &scope);
     qb.push(
-        "), agg AS (
-             SELECT mc.effective_path AS p,
-                    count(*) FILTER (WHERE mc.membership_status = 'active' AND NOT mc.is_leader) AS scouts,
-                    count(*) FILTER (WHERE mc.membership_status = 'active' AND mc.is_leader) AS leaders,
-                    count(*) FILTER (WHERE mc.membership_status = 'waiting') AS waiting,
-                    count(*) FILTER (WHERE mc.membership_status = 'pending') AS pending
-             FROM member_current mc, root r WHERE mc.effective_path <@ r.path GROUP BY 1
-         ), rolled AS (
+        "), rolled AS (
              SELECT subpath(a.p, 0, i) AS path, sum(a.scouts)::int8 AS scouts, sum(a.leaders)::int8 AS leaders,
                     sum(a.waiting)::int8 AS waiting, sum(a.pending)::int8 AS pending
              FROM agg a, root r, generate_series(nlevel(r.path) + 1, nlevel(a.p)) AS i GROUP BY 1

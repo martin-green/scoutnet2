@@ -12,7 +12,7 @@ use sqlx::{Postgres, QueryBuilder};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use super::bodies::load_visible_body;
+use super::bodies::{group_scope, load_visible_body};
 use crate::{
     AppState,
     auth::CurrentUser,
@@ -216,6 +216,7 @@ pub async fn list_members(
 ) -> ApiResult<Json<MemberPage>> {
     let started = Instant::now();
     let (_, _, body_path) = load_visible_body(&state, &user, &key, Permission::MembersRead).await?;
+    let scope = group_scope(&state, &body_path).await?;
     let roots = user.0.roots_for(Permission::MembersRead);
     let personal_roots = user.0.roots_for(Permission::PersonalRead);
     let economy_roots = user.0.roots_for(Permission::EconomyRead);
@@ -239,55 +240,25 @@ pub async fn list_members(
 
     let term = Term::containing(chrono::Local::now().date_naive());
     let term_end = term.end().checked_add_days(Days::new(1)).unwrap_or_else(|| term.end());
+    let ctx = LateralCtx { term, term_end, personal_roots, economy_roots };
 
-    // Registerutdrag och avgifter räknas bara fram där användaren har behörighet, så att filter
-    // och sortering inte kan användas för att härleda dolda uppgifter.
-    let mut qb = QueryBuilder::<Postgres>::new(
-        "SELECT mc.id, mc.member_no, mc.first_name, mc.last_name, mc.birth_date,
-                date_part('year', age(mc.birth_date))::int AS age, mc.sex, mc.membership_status, mc.member_since,
-                mc.waiting_since, mc.wished_troop_type, mc.group_id, mc.group_name, mc.troop_id, mc.troop_name,
-                mc.troop_type, mc.patrol_id, mc.patrol_name, mc.is_leader, mc.person_status,
-                mc.email, mc.alt_email, mc.mobile_phone, mc.home_phone, mc.national_id,
-                mc.effective_path::text AS effective_path,
-                gu.n AS guardian_count, gu.n_email AS guardian_email_count, att.pct AS attendance_pct,
-                pc.status AS police_check, pc.valid_until AS police_check_valid_until,
-                fee.fee_group, fee.status AS fee_status, fee.due_date AS fee_due_date,
-                count(*) OVER () AS total
-         FROM member_current mc
-         LEFT JOIN LATERAL (SELECT count(*) AS n, count(g.email) AS n_email FROM guardian g WHERE g.child_id = mc.id) gu ON true
-         LEFT JOIN LATERAL (
-             SELECT (count(*) FILTER (WHERE a.status = 'present'))::float8 / nullif(count(*), 0) AS pct
-             FROM attendance a JOIN meeting mt ON mt.id = a.meeting_id
-             WHERE a.person_id = mc.id AND mt.starts_at < now() AND mt.starts_at >= ",
-    );
-    qb.push_bind(term.start()).push(" AND mt.starts_at < ").push_bind(term_end).push(") att ON true");
-    qb.push(
-        " LEFT JOIN LATERAL (
-             SELECT CASE WHEN NOT s.required THEN 'not_required'
-                         WHEN s.shown_on IS NULL THEN 'missing'
-                         WHEN s.valid_until < current_date THEN 'expired'
-                         WHEN s.valid_until < current_date + 90 THEN 'expiring'
-                         ELSE 'valid' END AS status,
-                    s.valid_until
-             FROM police_check_status s
-             WHERE s.person_id = mc.id AND mc.effective_path <@ ANY(",
-    );
-    qb.push_bind(&personal_roots).push("::text[]::ltree[])) pc ON true");
-    qb.push(
-        " LEFT JOIN LATERAL (
-             SELECT mc.fee_group,
-                    CASE WHEN tf.paid_on IS NOT NULL THEN 'paid'
-                         WHEN tf.due_date < current_date THEN 'overdue'
-                         WHEN tf.id IS NOT NULL THEN 'unpaid' END AS status,
-                    tf.due_date
-             FROM (SELECT 1) one
-             LEFT JOIN term_fee tf ON tf.person_id = mc.id AND tf.group_id = mc.group_id AND tf.term_id = ",
-    );
-    qb.push_bind(term.id());
-    qb.push(" WHERE mc.effective_path <@ ANY(").push_bind(&economy_roots).push("::text[]::ltree[])) fee ON true");
-    qb.push(" WHERE mc.effective_path <@ ").push_bind(&body_path).push("::ltree");
-    qb.push(" AND mc.effective_path <@ ANY(").push_bind(&roots).push("::text[]::ltree[])");
-    qb.push(" AND mc.membership_status = ANY(").push_bind(&statuses).push(")");
+    // Två steg, så att listor över ett helt distrikt eller förbund går snabbt: urvalet (filter,
+    // sortering, sida och totalt antal) räknar bara fram de tunga uppslagen som filter eller
+    // sortering behöver. Övriga räknas fram för sidans rader.
+    let need = Laterals {
+        guardians: q.missing_guardian_email == Some(true),
+        attendance: order.contains("att."),
+        police: !police.is_empty() || order.contains("pc."),
+        fee: !fee_statuses.is_empty() || order.contains("fee."),
+    };
+    let mut qb =
+        QueryBuilder::<Postgres>::new("WITH hits AS (SELECT mc.id, count(*) OVER () AS total FROM member_current mc");
+    push_laterals(&mut qb, need, &ctx);
+    // Kårens räckvidd som parameter gör att urvalet kan använda index (se migration 0009).
+    qb.push(" WHERE mc.group_path <@ ").push_bind(scope).push("::ltree");
+    qb.push(" AND mc.effective_path <@ ").push_bind(body_path).push("::ltree");
+    qb.push(" AND mc.effective_path <@ ANY(").push_bind(roots).push("::text[]::ltree[])");
+    qb.push(" AND mc.membership_status = ANY(").push_bind(statuses).push(")");
 
     if let Some(text) = q.q.as_deref().map(str::trim).filter(|t| !t.is_empty()) {
         if text.chars().all(|c| c.is_ascii_digit()) {
@@ -301,7 +272,7 @@ pub async fn list_members(
         qb.push(" AND mc.troop_id = ").push_bind(troop_id);
     }
     if !troop_types.is_empty() {
-        qb.push(" AND mc.troop_type = ANY(").push_bind(&troop_types).push(")");
+        qb.push(" AND mc.troop_type = ANY(").push_bind(troop_types).push(")");
     }
     if let Some(from) = q.born_from {
         qb.push(" AND mc.birth_date >= make_date(").push_bind(from).push(", 1, 1)");
@@ -313,19 +284,33 @@ pub async fn list_members(
         qb.push(" AND mc.is_leader = ").push_bind(leaders);
     }
     if !sexes.is_empty() {
-        qb.push(" AND mc.sex = ANY(").push_bind(&sexes).push(")");
+        qb.push(" AND mc.sex = ANY(").push_bind(sexes).push(")");
     }
     if q.missing_guardian_email == Some(true) {
         qb.push(" AND gu.n > 0 AND gu.n_email = 0");
     }
     if !police.is_empty() {
-        qb.push(" AND pc.status = ANY(").push_bind(&police).push(")");
+        qb.push(" AND pc.status = ANY(").push_bind(police).push(")");
     }
     if !fee_statuses.is_empty() {
-        qb.push(" AND fee.status = ANY(").push_bind(&fee_statuses).push(")");
+        qb.push(" AND fee.status = ANY(").push_bind(fee_statuses).push(")");
     }
-    qb.push(" ORDER BY ").push(order);
+    qb.push(" ORDER BY ").push(&order);
     qb.push(" LIMIT ").push_bind(limit).push(" OFFSET ").push_bind(offset);
+    qb.push(
+        ") SELECT mc.id, mc.member_no, mc.first_name, mc.last_name, mc.birth_date,
+                date_part('year', age(mc.birth_date))::int AS age, mc.sex, mc.membership_status, mc.member_since,
+                mc.waiting_since, mc.wished_troop_type, mc.group_id, mc.group_name, mc.troop_id, mc.troop_name,
+                mc.troop_type, mc.patrol_id, mc.patrol_name, mc.is_leader, mc.person_status,
+                mc.email, mc.alt_email, mc.mobile_phone, mc.home_phone, mc.national_id,
+                mc.effective_path::text AS effective_path,
+                gu.n AS guardian_count, gu.n_email AS guardian_email_count, att.pct AS attendance_pct,
+                pc.status AS police_check, pc.valid_until AS police_check_valid_until,
+                fee.fee_group, fee.status AS fee_status, fee.due_date AS fee_due_date, h.total
+         FROM hits h JOIN member_current mc ON mc.id = h.id",
+    );
+    push_laterals(&mut qb, Laterals::ALL, &ctx);
+    qb.push(" ORDER BY ").push(&order);
 
     let rows: Vec<Row> = qb.build_query_as().fetch_all(&state.db).await?;
     let total = rows.first().map_or(0, |r| r.total);
@@ -396,10 +381,81 @@ pub async fn list_members(
         total,
         limit,
         offset,
-        term: term.to_string(),
+        term: ctx.term.to_string(),
         redacted_fields: redacted.into_iter().map(str::to_owned).collect(),
         took_ms: started.elapsed().as_secs_f64() * 1000.0,
     }))
+}
+
+/// Tunga uppslag per person i medlemslistan.
+#[derive(Clone, Copy)]
+#[expect(clippy::struct_excessive_bools, reason = "en flagga per uppslag, oberoende av varandra")]
+struct Laterals {
+    guardians: bool,
+    attendance: bool,
+    police: bool,
+    fee: bool,
+}
+
+impl Laterals {
+    const ALL: Self = Self { guardians: true, attendance: true, police: true, fee: true };
+}
+
+struct LateralCtx {
+    term: Term,
+    term_end: NaiveDate,
+    personal_roots: Vec<String>,
+    economy_roots: Vec<String>,
+}
+
+/// Lägger till de uppslag som behövs. Registerutdrag och avgifter räknas bara fram där användaren
+/// har behörighet, så att filter och sortering inte kan användas för att härleda dolda uppgifter.
+fn push_laterals(qb: &mut QueryBuilder<Postgres>, need: Laterals, ctx: &LateralCtx) {
+    if need.guardians {
+        qb.push(
+            " LEFT JOIN LATERAL (SELECT count(*) AS n, count(g.email) AS n_email FROM guardian g WHERE g.child_id = mc.id) gu ON true",
+        );
+    }
+    if need.attendance {
+        qb.push(
+            " LEFT JOIN LATERAL (
+                 SELECT (count(*) FILTER (WHERE a.status = 'present'))::float8 / nullif(count(*), 0) AS pct
+                 FROM attendance a JOIN meeting mt ON mt.id = a.meeting_id
+                 WHERE a.person_id = mc.id AND mt.starts_at < now() AND mt.starts_at >= ",
+        );
+        qb.push_bind(ctx.term.start()).push(" AND mt.starts_at < ").push_bind(ctx.term_end).push(") att ON true");
+    }
+    if need.police {
+        qb.push(
+            " LEFT JOIN LATERAL (
+                 SELECT CASE WHEN NOT s.required THEN 'not_required'
+                             WHEN s.shown_on IS NULL THEN 'missing'
+                             WHEN s.valid_until < current_date THEN 'expired'
+                             WHEN s.valid_until < current_date + 90 THEN 'expiring'
+                             ELSE 'valid' END AS status,
+                        s.valid_until
+                 FROM police_check_status s
+                 WHERE s.person_id = mc.id AND mc.effective_path <@ ANY(",
+        );
+        qb.push_bind(ctx.personal_roots.clone()).push("::text[]::ltree[])) pc ON true");
+    }
+    if need.fee {
+        // Vanlig join (inte LATERAL), så att Postgres kan hash-joina vid stora urval. Behörigheten
+        // kontrolleras per rad: utan ekonomibehörighet blir alla avgiftsfält NULL.
+        qb.push(" LEFT JOIN term_fee tf ON tf.person_id = mc.id AND tf.group_id = mc.group_id AND tf.term_id = ");
+        qb.push_bind(ctx.term.id());
+        qb.push(
+            " CROSS JOIN LATERAL (
+                 SELECT CASE WHEN x.ok THEN mc.fee_group END AS fee_group,
+                        CASE WHEN NOT x.ok THEN NULL
+                             WHEN tf.paid_on IS NOT NULL THEN 'paid'
+                             WHEN tf.due_date < current_date THEN 'overdue'
+                             WHEN tf.id IS NOT NULL THEN 'unpaid' END AS status,
+                        CASE WHEN x.ok THEN tf.due_date END AS due_date
+                 FROM (SELECT mc.effective_path <@ ANY(",
+        );
+        qb.push_bind(ctx.economy_roots.clone()).push("::text[]::ltree[]) AS ok) x) fee");
+    }
 }
 
 pub fn router() -> Router<AppState> {

@@ -10,6 +10,7 @@ Förstudie och plan för ett modernt, API-först medlemssystem för Scouterna, s
 | [docs/02-plan.md](docs/02-plan.md) | Implementationsplan: mål, arkitektur, Rust-policy, domänmodell, API-design, säkerhet och inloggning via ScoutID, GDPR, UX, närvaro och bidrag, integrationer, migrering (inklusive flytt av lösenord till ScoutID), faser, risker och beslut |
 | [docs/03-prototyp.md](docs/03-prototyp.md) | Skunk works-prototyp på 6 veckor: mål, demo-manus, veckoplan och status |
 | [docs/04-faltkatalog.md](docs/04-faltkatalog.md) | Alla personfält i Scoutnet med motsvarighet i Scoutnet 2: API-namn, tabell, dataklass, behörighet och kompatibilitetsnamn |
+| [docs/05-prestanda.md](docs/05-prestanda.md) | Prestandamätning med 100 000 syntetiska personer: metod, resultat (p50/p95 per scenario) och åtgärder |
 
 ## Status
 
@@ -31,6 +32,8 @@ cargo run -p sn-server --bin sn-server            # http://127.0.0.1:8080 (API, 
 - Utveckling av webben med hot reload: `cd web; npm run dev` (proxar API-anrop till port 8080). Typer från API:t genereras med `npm run api:types`.
 - Kvalitetskontroller: `cargo clippy --workspace --all-targets`, `cargo test --workspace`, `cd web; npm run check` och rökprovet `python scripts/smoke.py` (servern ska vara igång, och Keycloak för ScoutID-kontrollerna).
 - Storlek på testdata: `cargo run -p sn-server --bin seed -- --districts 4 --groups 5 --seed 42`.
+- Prestanda med 100 000 personer: seeda en separat databas med `--districts 28 --groups 28`, starta ett release-bygge och kör `python scripts/perf.py` (instruktioner i skriptet, resultat i [docs/05-prestanda.md](docs/05-prestanda.md)).
+- Integrationer: API-nycklar skapas per kår under *Integrationer*. `GET /api/group/memberlist` svarar i Scoutnets format (HTTP Basic: kårnummer och nyckel).
 
 Konfiguration via miljövariabler: `DATABASE_URL`, `SN_BIND`, `SN_PUBLIC_URL`, `SN_COOKIE_SECURE`, `SN_SESSION_HOURS`, `SN_DEV_LOGIN` och för ScoutID `SN_OIDC_ISSUER`, `SN_OIDC_CLIENT_ID`, `SN_OIDC_CLIENT_SECRET` (se [config.rs](crates/sn-server/src/config.rs)). I utvecklingsläge pekar ScoutID som standard på den lokala Keycloaken, och `SN_OIDC_ISSUER=` (tomt) stänger av OIDC.
 
