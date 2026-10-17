@@ -60,7 +60,7 @@
 				</dl>
 				<button class="btn" onclick={() => (open = true)}>Visa alla mina uppgifter</button>
 			{:else if missing}
-				<p class="muted">Du är registrerad som vårdnadshavare. Vyn "Mina scouter", med anmälan av förhinder och fakturor, kommer i vecka 2.</p>
+				<p class="muted">Du är registrerad som vårdnadshavare. Vyn "Mina scouter", med anmälan av förhinder och fakturor, ingår inte i prototypen ännu.</p>
 			{/if}
 		</section>
 

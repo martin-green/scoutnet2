@@ -28,6 +28,7 @@ cargo run -p sn-server --bin sn-server            # http://127.0.0.1:8080 (API, 
 ```
 
 - Öppna <http://127.0.0.1:8080> och välj **Logga in med ScoutID** (testkonton i [deploy/keycloak/README.md](deploy/keycloak/README.md), lösenord `scout`), eller en demoroll för snabbinloggning. Enheter har läsbara adresser, t.ex. <http://127.0.0.1:8080/kar/1001>, `/avdelning/5002/narvaro` och `/kar/1001/bidrag`.
+- Demo med ett kommando (release-bygge, färsk data och med `-Perf` även 100 000 personer på port 8081): `./scripts/demo.ps1 -Perf`. Se [demo-miljö och generalrepetition](docs/03-prototyp.md#demo-miljö-och-generalrepetition).
 - API-dokumentation (OpenAPI 3.1, Scalar): <http://127.0.0.1:8080/docs>. Råspecifikationen finns på `/openapi.json`.
 - Utveckling av webben med hot reload: `cd web; npm run dev` (proxar API-anrop till port 8080). Typer från API:t genereras med `npm run api:types`.
 - Kvalitetskontroller: `cargo clippy --workspace --all-targets`, `cargo test --workspace`, `cd web; npm run check` och rökprovet `python scripts/smoke.py` (servern ska vara igång, och Keycloak för ScoutID-kontrollerna).

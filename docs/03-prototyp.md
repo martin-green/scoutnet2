@@ -52,6 +52,31 @@ Följande ingår inte: fakturering och betalningar (terminsavgifternas status vi
 | 6 | Öppna `/docs` och kör samma anrop via API:t | API först |
 | 7 | Prestanda: kör `python scripts/perf.py` mot 100 000 syntetiska personer. Som **förbundsadministratör**: hela förbundets medlemslista, sök på namn och organisationsträdet. | Skalbarhet: kår under 25 ms, hela förbundet 120–200 ms ([mätresultat](./05-prestanda.md)) |
 
+## Demo-miljö och generalrepetition
+
+Allt körs lokalt på demodatorn med ett kommando:
+
+```powershell
+./scripts/demo.ps1 -Perf
+```
+
+Skriptet gör följande:
+- startar PostgreSQL och ScoutID (Keycloak) i Docker
+- bygger servern (release) och webbappen
+- fyller demodatabasen med färsk syntetisk data
+- startar Scoutnet 2 på <http://127.0.0.1:8080>
+
+Med `-Perf` startar det också en server med 100 000 personer på <http://127.0.0.1:8081>, med bara demoroller. Den databasen seedas bara första gången. För en snabb omstart utan bygge och ny data: `./scripts/demo.ps1 -SkipBuild -KeepData`.
+
+Checklista, dagen före och en timme före:
+
+1. Kör `./scripts/demo.ps1 -Perf` med nätverk. Första gången hämtas Docker-avbilderna och beroendena, sedan behövs inget nätverk.
+2. I ett annat fönster: `python scripts/smoke.py` (91 kontroller, alla ska vara OK) och `python scripts/perf.py` (alla scenarier under 250 ms).
+3. Logga in en gång med ScoutID som 9000033 för att se att Keycloak svarar. Testkonton finns i [deploy/keycloak/README.md](../deploy/keycloak/README.md).
+4. Gå igenom manuset ovan med varje roll. Seeden ger samma personas och medlemsnummer varje dag, men övriga namn kan variera med datumet.
+5. Projektor: webbläsarens zoom på 125–150 %, ljust läge och ett eget webbläsarfönster utan andra flikar.
+6. Reserv: en skärminspelning av hela manuset, om datorn eller Docker strular.
+
 ## Veckoplan
 
 | Vecka | Leverans |
