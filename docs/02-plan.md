@@ -1053,6 +1053,10 @@ I prototypen är allt samlat i två crates: `sn-domain` (domäntyper) och `sn-se
 | `GET/POST /v1/bodies/{id}/waitlist` · `POST /v1/waitlist/{id}:offer` | Väntelista och erbjudanden |
 | `GET/POST /v1/role-assignments` | Rolltilldelningar med räckvidd och period |
 | `GET/POST /v1/bodies/{id}/meetings` · `PUT /v1/meetings/{id}/attendance` | Möten och närvaro (idempotent helhetsuppdatering) |
+| `GET /v1/bodies/{id}/attendance?term=` · `/attendance/summary` | Närvarolista (personer × möten) per avdelning och översikt per kår |
+| `GET /v1/bodies/{id}/grants?term=` · `GET /v1/bodies/{id}/grants/dak` | Bidragsunderlag mot kommunens regler och DAK 2.2-export (personnummer: step-up, loggas) |
+| `GET/POST /v1/bodies/{id}/views` · `DELETE /v1/views/{id}` | Sparade vyer, egna eller delade i enheten |
+| `POST/DELETE /v1/bodies/{id}/calendar` · `GET /ical/{token}.ics` | Kalenderprenumeration med återkallbar token |
 | `POST /v1/grant-reports` | Generera bidragsunderlag (regeluppsättning, period, enheter) som asynkront jobb |
 | `GET/POST /v1/events` · `POST /v1/events/{id}/registrations` | Arrangemang och anmälningar |
 | `GET /v1/invoices` · `POST /v1/payments` | Fakturor och betalningar |

@@ -20,17 +20,19 @@ Förstudie och **prototyp under arbete** (se [03-prototyp.md](docs/03-prototyp.m
 Krav: Rust (versionen väljs automatiskt av `rust-toolchain.toml`), Docker, Node 24 och Python 3 för rökprovet.
 
 ```powershell
-docker compose up -d                              # PostgreSQL 18 på 127.0.0.1:5433
+docker compose up -d                              # PostgreSQL 18 (127.0.0.1:5433) och lokal ScoutID/Keycloak (127.0.0.1:8180)
 cargo run -p sn-server --bin seed                 # migrerar och fyller med syntetisk data (cirka 2 500 personer)
 cd web; npm ci; npm run build; cd ..              # bygger webbappen till web/build
 cargo run -p sn-server --bin sn-server            # http://127.0.0.1:8080 (API, webbapp och /docs)
 ```
 
-- Öppna <http://127.0.0.1:8080> och välj en demoroll (medlemsregistrerare, avdelningsledare, scout, vårdnadshavare …). Enheter har läsbara adresser, t.ex. <http://127.0.0.1:8080/kar/1001> och <http://127.0.0.1:8080/distrikt/1/organisation>.
+- Öppna <http://127.0.0.1:8080> och välj **Logga in med ScoutID** (testkonton i [deploy/keycloak/README.md](deploy/keycloak/README.md), lösenord `scout`), eller en demoroll för snabbinloggning. Enheter har läsbara adresser, t.ex. <http://127.0.0.1:8080/kar/1001>, `/avdelning/5002/narvaro` och `/kar/1001/bidrag`.
 - API-dokumentation (OpenAPI 3.1, Scalar): <http://127.0.0.1:8080/docs>. Råspecifikationen finns på `/openapi.json`.
 - Utveckling av webben med hot reload: `cd web; npm run dev` (proxar API-anrop till port 8080). Typer från API:t genereras med `npm run api:types`.
-- Kvalitetskontroller: `cargo clippy --workspace --all-targets`, `cargo test --workspace`, `cd web; npm run check` och rökprovet `python scripts/smoke.py` (servern ska vara igång).
+- Kvalitetskontroller: `cargo clippy --workspace --all-targets`, `cargo test --workspace`, `cd web; npm run check` och rökprovet `python scripts/smoke.py` (servern ska vara igång, och Keycloak för ScoutID-kontrollerna).
 - Storlek på testdata: `cargo run -p sn-server --bin seed -- --districts 4 --groups 5 --seed 42`.
+
+Konfiguration via miljövariabler: `DATABASE_URL`, `SN_BIND`, `SN_PUBLIC_URL`, `SN_COOKIE_SECURE`, `SN_SESSION_HOURS`, `SN_DEV_LOGIN` och för ScoutID `SN_OIDC_ISSUER`, `SN_OIDC_CLIENT_ID`, `SN_OIDC_CLIENT_SECRET` (se [config.rs](crates/sn-server/src/config.rs)). I utvecklingsläge pekar ScoutID som standard på den lokala Keycloaken, och `SN_OIDC_ISSUER=` (tomt) stänger av OIDC.
 
 Snabbinloggningen med personas finns bara i utvecklingsläge (`SN_DEV_LOGIN=true`, standard i prototypen). I produktion sker all inloggning via ScoutID.
 
