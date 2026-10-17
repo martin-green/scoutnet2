@@ -163,6 +163,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/bodies/{id}/calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Skapar en ny kalenderadress för enheten. En tidigare adress för samma enhet slutar fungera. */
+        post: operations["create_calendar"];
+        /** Återkallar kalenderadressen för enheten. */
+        delete: operations["delete_calendar"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/bodies/{id}/children": {
         parameters: {
             query?: never;
@@ -531,6 +549,10 @@ export interface components {
             name: string;
             /** Format: int32 */
             number: number;
+        };
+        CalendarSubscription: {
+            /** @description Prenumerationsadress (webcal/https). Visas bara när den skapas. */
+            url: string;
         };
         ConsentDto: {
             /** Format: date-time */
@@ -1441,6 +1463,64 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TermAttendanceSummary"];
                 };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_calendar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Enhetens id eller nyckel, t.ex. `troop-5003` */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarSubscription"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    delete_calendar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Enhetens id eller nyckel */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             404: {
                 headers: {

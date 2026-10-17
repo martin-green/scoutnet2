@@ -35,6 +35,8 @@ use crate::{auth, routes};
         routes::views::delete_view,
         routes::grants::grant_report,
         routes::grants::dak_export,
+        routes::calendar::create_calendar,
+        routes::calendar::delete_calendar,
         auth::dev_personas,
         auth::dev_login,
         auth::logout,

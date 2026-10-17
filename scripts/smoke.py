@@ -232,6 +232,21 @@ check(st == 200 and not lgr["can_export_dak"] and call(leader, "GET", f"/v1/bodi
       "avdelningsledare ser underlaget men får inte ladda ner personnummer (403)")
 check(call(login("Distriktsordförande"), "GET", "/v1/bodies/district-1/grants")[0] == 400, "bidrag tas fram per kår eller avdelning")
 
+# Kalenderprenumeration (iCal)
+st, sub, _ = call(leader, "POST", f"/v1/bodies/{tkey}/calendar", None, {"x-sn-csrf": "1"})
+feed_path = sub["url"].removeprefix(BASE) if st == 201 else ""
+st, ics, hdrs = call(anon, "GET", feed_path)
+ics_text = ics.decode() if isinstance(ics, bytes) else ""
+check(st == 200 and hdrs.get("content-type", "").startswith("text/calendar") and ics_text.count("BEGIN:VEVENT") >= 5
+      and "@example.org" not in ics_text and "070-" not in ics_text,
+      f"iCal-flöde utan inloggning: {ics_text.count('BEGIN:VEVENT')} möten, inga personuppgifter")
+st, sub2, _ = call(leader, "POST", f"/v1/bodies/{tkey}/calendar", None, {"x-sn-csrf": "1"})
+check(call(anon, "GET", feed_path)[0] == 404 and call(anon, "GET", sub2["url"].removeprefix(BASE))[0] == 200,
+      "ny kalenderadress ersätter den gamla")
+check(call(leader, "DELETE", f"/v1/bodies/{tkey}/calendar", None, {"x-sn-csrf": "1"})[0] == 204
+      and call(anon, "GET", sub2["url"].removeprefix(BASE))[0] == 404 and call(anon, "GET", "/ical/abc.ics")[0] == 404,
+      "återkallad eller ogiltig kalenderadress ger 404")
+
 scout = login("Scout")
 st, sme, _ = call(scout, "GET", "/v1/me")
 check(st == 200 and not sme["contexts"], "scout utan roll har inga kontexter")

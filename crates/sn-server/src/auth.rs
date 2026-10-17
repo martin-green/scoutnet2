@@ -64,6 +64,30 @@ struct GrantRow {
     role_key: String,
 }
 
+/// Personens aktuella rolltilldelningar. Används för sessioner och för kalenderflöden.
+pub(crate) async fn load_grants(db: &sqlx::PgPool, person_id: Uuid) -> ApiResult<Vec<Grant>> {
+    Ok(sqlx::query_as::<_, GrantRow>(
+        "SELECT b.id AS body_id, b.path::text AS body_path, b.name AS body_name, b.kind AS body_kind,
+                b.number AS body_number, ra.role_key
+         FROM role_assignment ra JOIN body b ON b.id = ra.body_id
+         WHERE ra.person_id = $1 AND ra.valid @> current_date
+         ORDER BY nlevel(b.path), b.name",
+    )
+    .bind(person_id)
+    .fetch_all(db)
+    .await?
+    .into_iter()
+    .map(|g| Grant {
+        body_id: g.body_id,
+        body_path: g.body_path,
+        body_name: g.body_name,
+        body_kind: g.body_kind,
+        body_number: g.body_number,
+        role_key: g.role_key,
+    })
+    .collect())
+}
+
 async fn load_principal(state: &AppState, token: &str) -> ApiResult<Option<Principal>> {
     let Some(row) = sqlx::query_as::<_, SessionRow>(
         "SELECT a.id AS account_id, p.id AS person_id, p.member_no, p.first_name || ' ' || p.last_name AS display_name,
@@ -78,26 +102,7 @@ async fn load_principal(state: &AppState, token: &str) -> ApiResult<Option<Princ
         return Ok(None);
     };
 
-    let grants = sqlx::query_as::<_, GrantRow>(
-        "SELECT b.id AS body_id, b.path::text AS body_path, b.name AS body_name, b.kind AS body_kind,
-                b.number AS body_number, ra.role_key
-         FROM role_assignment ra JOIN body b ON b.id = ra.body_id
-         WHERE ra.person_id = $1 AND ra.valid @> current_date
-         ORDER BY nlevel(b.path), b.name",
-    )
-    .bind(row.person_id)
-    .fetch_all(&state.db)
-    .await?
-    .into_iter()
-    .map(|g| Grant {
-        body_id: g.body_id,
-        body_path: g.body_path,
-        body_name: g.body_name,
-        body_kind: g.body_kind,
-        body_number: g.body_number,
-        role_key: g.role_key,
-    })
-    .collect();
+    let grants = load_grants(&state.db, row.person_id).await?;
 
     Ok(Some(Principal {
         account_id: row.account_id,

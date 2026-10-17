@@ -78,6 +78,8 @@ export const api = {
 	deleteView: (id: string) => request<void>('DELETE', `/v1/views/${id}`),
 	grants: (id: string, term?: string) =>
 		request<GrantReport>('GET', `/v1/bodies/${id}/grants${term ? `?term=${encodeURIComponent(term)}` : ''}`),
+	createCalendar: (id: string) => request<{ url: string }>('POST', `/v1/bodies/${id}/calendar`),
+	deleteCalendar: (id: string) => request<void>('DELETE', `/v1/bodies/${id}/calendar`),
 	revealNationalId: (id: string) =>
 		request<{ national_id: string }>('POST', `/v1/people/${id}/reveal-national-id`),
 	personas: () => request<Persona[]>('GET', '/auth/dev/personas'),

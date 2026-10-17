@@ -38,7 +38,8 @@ export default defineConfig({
 			'/auth': api,
 			'/docs': api,
 			'/openapi.json': api,
-			'/healthz': api
+			'/healthz': api,
+			'/ical': api
 		}
 	}
 });

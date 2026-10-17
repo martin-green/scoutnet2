@@ -68,6 +68,20 @@
 		else reload++;
 	}
 
+	// Kalenderprenumeration: en ny adress skapas vid varje klick och ersätter den förra.
+	let calendarUrl = $state<string | null>(null);
+	async function subscribe() {
+		if (calendarUrl) {
+			calendarUrl = null;
+			return;
+		}
+		calendarUrl = (await api.createCalendar(`${body.kind}-${body.number}`)).url;
+	}
+	async function revokeCalendar() {
+		await api.deleteCalendar(`${body.kind}-${body.number}`);
+		calendarUrl = null;
+	}
+
 	const totals = $derived.by(() => {
 		const t = { planned: 0, held: 0, missing: 0, members: 0 };
 		for (const r of summary?.troops ?? []) {
@@ -94,7 +108,23 @@
 	{#if matrix?.can_write}
 		<button class="btn primary" onclick={() => (planning = true)}>＋ Planera möten</button>
 	{/if}
+	<button class="btn" onclick={subscribe}>📅 Kalender</button>
 </header>
+
+{#if calendarUrl}
+	<div class="card calendar" role="region" aria-label="Kalenderprenumeration">
+		<p>
+			Prenumerera på {body.name}s möten i din kalender (Google, Outlook, iPhone). Adressen är personlig och ger
+			bara mötestider, inga personuppgifter.
+		</p>
+		<div class="cal-row">
+			<input class="input" readonly value={calendarUrl} aria-label="Kalenderadress" onfocus={(e) => e.currentTarget.select()} />
+			<button class="btn" onclick={() => navigator.clipboard.writeText(calendarUrl!)}>Kopiera</button>
+			<a class="btn" href={calendarUrl.replace(/^https?:/, 'webcal:')}>Öppna i kalendern</a>
+			<button class="btn ghost" onclick={revokeCalendar}>Återkalla</button>
+		</div>
+	</div>
+{/if}
 
 {#if error}
 	<p class="notice error">Kunde inte hämta: {error}</p>
@@ -263,6 +293,22 @@
 	}
 	h1 .muted {
 		font-weight: 400;
+	}
+	.calendar {
+		margin-top: var(--space-3);
+	}
+	.calendar p {
+		margin: 0 0 var(--space-2);
+	}
+	.cal-row {
+		display: flex;
+		gap: var(--space-2);
+		flex-wrap: wrap;
+	}
+	.cal-row .input {
+		flex: 1 1 320px;
+		font-family: var(--mono);
+		font-size: 0.82rem;
 	}
 	.term {
 		display: flex;
