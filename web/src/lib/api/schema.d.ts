@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/api/group/memberlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Medlemslista i Scoutnets format, för befintliga integrationer. Autentisering med HTTP Basic:
+         *     användarnamn = kårens nummer, lösenord = API-nyckel.
+         */
+        get: operations["memberlist"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/callback": {
         parameters: {
             query?: never;
@@ -112,6 +132,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/api-keys/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Återkallar en API-nyckel direkt. */
+        delete: operations["revoke_key"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/bodies/{id}": {
         parameters: {
             query?: never;
@@ -123,6 +160,24 @@ export interface paths {
         get: operations["get_body"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/bodies/{id}/api-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Kårens aktiva API-nycklar. Kräver `members_manage`. */
+        get: operations["list_keys"];
+        put?: never;
+        /** Skapar en API-nyckel för kåren. Personnummer kräver behörigheten `national_id_read`. */
+        post: operations["create_key"];
         delete?: never;
         options?: never;
         head?: never;
@@ -157,6 +212,23 @@ export interface paths {
         get: operations["attendance_summary"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/bodies/{id}/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Utför en massåtgärd i kåren. Kräver `members_manage` i kåren. */
+        post: operations["bulk"];
         delete?: never;
         options?: never;
         head?: never;
@@ -380,6 +452,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/people/{id}/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Händelser som rör en person: visningar av personkortet, visade personnummer och ändringar. */
+        get: operations["person_audit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/people/{id}/reveal-national-id": {
         parameters: {
             query?: never;
@@ -434,6 +523,17 @@ export interface components {
             /** Format: date */
             valid_to?: string | null;
         };
+        ApiKeyInfo: {
+            /** Format: date-time */
+            created_at: string;
+            created_by?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            last_used_at?: string | null;
+            name: string;
+            scopes: string[];
+        };
         AttendanceEntry: {
             /** Format: uuid */
             person_id: string;
@@ -481,6 +581,30 @@ export interface components {
         AttendanceUpdate: {
             /** @description Hela närvaron för mötet. Personer som inte finns med tas bort (idempotent helhetsuppdatering). */
             entries: components["schemas"]["AttendanceEntry"][];
+        };
+        AuditEntry: {
+            /** @description Maskinläsbar händelse, t.ex. `person.read`, `person.national_id.reveal`, `bulk.move`. */
+            action: string;
+            /** @description Vem som gjorde det. `null` om kontot har tagits bort. */
+            actor?: string | null;
+            /** @description Aktörens nuvarande roller, för att förstå varför hen hade åtkomst. */
+            actor_roles: string[];
+            /** Format: date-time */
+            at: string;
+            /** @description Om det var personen själv. */
+            by_self: boolean;
+            /** @description Händelsen på svenska. */
+            description: string;
+        };
+        AuditLog: {
+            entries: components["schemas"]["AuditEntry"][];
+            /** Format: uuid */
+            person_id: string;
+            /**
+             * Format: int64
+             * @description Antal visningar av andra än personen själv de senaste 365 dagarna.
+             */
+            views_by_others: number;
         };
         AuthConfig: {
             /** @description Snabbinloggning med personas (endast utveckling och demo). */
@@ -550,6 +674,42 @@ export interface components {
             /** Format: int32 */
             number: number;
         };
+        BulkRequest: {
+            /** @description `move` (flytta aktiva medlemmar) eller `admit` (ta in från väntelista eller godkänn väntande). */
+            action: string;
+            /** @description Visa vad som skulle hända utan att ändra något. */
+            dry_run?: boolean;
+            /**
+             * Format: uuid
+             * @description Patrull i avdelningen (valfritt).
+             */
+            patrol_id?: string | null;
+            person_ids: string[];
+            /**
+             * Format: uuid
+             * @description Avdelningen i kåren som personerna ska placeras i.
+             */
+            troop_id: string;
+        };
+        BulkResult: {
+            action: string;
+            /** @description Antal som ändras (eller skulle ändras vid torrkörning). */
+            changed: number;
+            dry_run: boolean;
+            rows: components["schemas"]["BulkRow"][];
+            skipped: number;
+        };
+        BulkRow: {
+            /** @description Nuvarande placering eller status, t.ex. "Vargarna / Patrull Ugglan" eller "Väntelista". */
+            from: string;
+            message?: string | null;
+            name: string;
+            /** @description `ok`, `warning` (genomförs, men se meddelandet) eller `skip` (genomförs inte). */
+            outcome: string;
+            /** Format: uuid */
+            person_id: string;
+            to: string;
+        };
         CalendarSubscription: {
             /** @description Prenumerationsadress (webcal/https). Visas bara när den skapas. */
             url: string;
@@ -581,6 +741,11 @@ export interface components {
             permissions: components["schemas"]["Permission"][];
             roles: string[];
         };
+        CreateApiKey: {
+            name: string;
+            /** @description `memberlist` (krävs), `memberlist:contact`, `memberlist:ssno`. */
+            scopes: string[];
+        };
         CreateMeetings: {
             /**
              * Format: date
@@ -610,6 +775,14 @@ export interface components {
             query: string;
             /** @description Dela med alla som ser listan i enheten. */
             shared?: boolean;
+        };
+        CreatedApiKey: {
+            endpoint: string;
+            info: components["schemas"]["ApiKeyInfo"];
+            /** @description Nyckeln. Visas bara nu och kan inte hämtas igen. */
+            key: string;
+            /** @description Användarnamn vid Basic-autentisering (kårens nummer, som i Scoutnet). */
+            username: string;
         };
         /** @description En överliggande enhet i brödsmulorna. */
         CrumbDto: {
@@ -1249,6 +1422,40 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    memberlist: {
+        parameters: {
+            query?: {
+                /** @description Kårens nummer. Alternativ till Basic-autentisering (avråds, nyckeln hamnar i loggar). */
+                id?: string;
+                /** @description API-nyckel. Alternativ till Basic-autentisering (avråds). */
+                key?: string;
+                /** @description `1` = väntelistan i stället för aktiva medlemmar. */
+                waiting?: string;
+                /** @description `1` = medlemmar som väntar på godkännande. */
+                awaiting_approval?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description `{data: {medlemsnummer: {fält: {value, raw_value}}}, labels}` */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Fel kår-id eller nyckel */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     callback: {
         parameters: {
             query?: {
@@ -1370,6 +1577,34 @@ export interface operations {
             };
         };
     };
+    revoke_key: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Nyckelns id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     get_body: {
         parameters: {
             query?: never;
@@ -1391,6 +1626,86 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_keys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Kårens id eller nyckel, t.ex. `group-1001` */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiKeyInfo"][];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    create_key: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Kårens id eller nyckel */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateApiKey"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedApiKey"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1462,6 +1777,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TermAttendanceSummary"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    bulk: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Kårens id eller nyckel, t.ex. `group-1001` */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkResult"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
                 };
             };
             404: {
@@ -2120,6 +2485,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PersonDetail"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    person_audit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Personens id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditLog"];
                 };
             };
             404: {

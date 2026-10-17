@@ -19,6 +19,7 @@
 		type PersonDetail
 	} from '#lib/api/client.ts';
 	import { bodyHref } from '#lib/bodies.ts';
+	import AuditList from './AuditList.svelte';
 
 	let { id, onclose, onopen }: { id: string; onclose: () => void; onopen?: (id: string) => void } = $props();
 
@@ -27,7 +28,7 @@
 	let revealed = $state<string | null>(null);
 	let revealError = $state<string | null>(null);
 
-	type Tab = 'oversikt' | 'familj' | 'medlemskap' | 'uppdrag' | 'meriter' | 'ovrigt';
+	type Tab = 'oversikt' | 'familj' | 'medlemskap' | 'uppdrag' | 'meriter' | 'ovrigt' | 'logg';
 	// Fliken behålls när man bläddrar mellan personer.
 	let tab = $state<Tab>('oversikt');
 
@@ -73,8 +74,13 @@
 			{ key: 'medlemskap' as Tab, label: 'Medlemskap', dot: unpaid },
 			{ key: 'uppdrag' as Tab, label: 'Uppdrag', dot: warn },
 			{ key: 'meriter' as Tab, label: 'Meriter', count: person.merits.length || undefined },
-			{ key: 'ovrigt' as Tab, label: 'Inställningar' }
+			{ key: 'ovrigt' as Tab, label: 'Inställningar' },
+			...(can('audit_read') ? [{ key: 'logg' as Tab, label: 'Logg' }] : [])
 		];
+	});
+	// Fliken Logg finns inte för alla; byt till översikten om den inte finns för nästa person.
+	$effect(() => {
+		if (person && !tabs.some((t) => t.key === tab)) tab = 'oversikt';
 	});
 </script>
 
@@ -476,6 +482,11 @@
 					<p class="muted small">Synlig för medlemsregistrerare och kårordförande. Får inte innehålla hälsouppgifter.</p>
 				</section>
 			{/if}
+		{:else if tab === 'logg'}
+			<section>
+				<h3>Vem har sett och ändrat uppgifterna</h3>
+				<AuditList personId={person.id} />
+			</section>
 		{/if}
 
 		<p class="muted small audit">👁 Den här visningen har registrerats i revisionsloggen.</p>
@@ -562,7 +573,7 @@
 	.tab {
 		border: 0;
 		background: none;
-		padding: 10px 9px 8px;
+		padding: 10px 6px 8px;
 		font: inherit;
 		font-size: 0.9rem;
 		color: var(--muted);

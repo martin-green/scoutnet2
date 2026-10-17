@@ -60,6 +60,9 @@
 						: []),
 					...(permissions.includes('reports_read') && ['group', 'troop'].includes(current.kind)
 						? [{ href: bodyHref(current, 'bidrag'), label: 'Bidrag', icon: '📄' }]
+						: []),
+					...(permissions.includes('members_manage') && current.kind === 'group'
+						? [{ href: bodyHref(current, 'integrationer'), label: 'Integrationer', icon: '🔌' }]
 						: [])
 				]
 			: []

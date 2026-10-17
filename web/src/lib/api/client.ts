@@ -24,6 +24,12 @@ export type PersonDetail = Schemas['PersonDetail'];
 export type Persona = Schemas['Persona'];
 export type Permission = Schemas['Permission'];
 export type Problem = Schemas['Problem'];
+export type BulkRequest = Schemas['BulkRequest'];
+export type BulkResult = Schemas['BulkResult'];
+export type AuditLog = Schemas['AuditLog'];
+export type AuditEntry = Schemas['AuditEntry'];
+export type ApiKeyInfo = Schemas['ApiKeyInfo'];
+export type CreatedApiKey = Schemas['CreatedApiKey'];
 
 export class ApiError extends Error {
 	constructor(
@@ -82,6 +88,12 @@ export const api = {
 	deleteCalendar: (id: string) => request<void>('DELETE', `/v1/bodies/${id}/calendar`),
 	revealNationalId: (id: string) =>
 		request<{ national_id: string }>('POST', `/v1/people/${id}/reveal-national-id`),
+	personAudit: (id: string) => request<AuditLog>('GET', `/v1/people/${id}/audit`),
+	bulk: (id: string, body: BulkRequest) => request<BulkResult>('POST', `/v1/bodies/${id}/bulk`, body),
+	apiKeys: (id: string) => request<ApiKeyInfo[]>('GET', `/v1/bodies/${id}/api-keys`),
+	createApiKey: (id: string, body: Schemas['CreateApiKey']) =>
+		request<CreatedApiKey>('POST', `/v1/bodies/${id}/api-keys`, body),
+	revokeApiKey: (id: string) => request<void>('DELETE', `/v1/api-keys/${id}`),
 	personas: () => request<Persona[]>('GET', '/auth/dev/personas'),
 	devLogin: (account_id: string) => request<void>('POST', '/auth/dev/login', { account_id }),
 	logout: () => request<{ logout_url?: string | null } | undefined>('POST', '/auth/logout'),
@@ -221,6 +233,9 @@ export const fmtWhen = (ts: string) => {
 	const d = new Date(ts);
 	return `${new Intl.DateTimeFormat('sv-SE', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Europe/Stockholm' }).format(d)} ${timeFmt.format(d)}`;
 };
+const dateTimeFmt = new Intl.DateTimeFormat('sv-SE', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Stockholm' });
+/** Tidpunkt med år, t.ex. "2026-10-17 21:54". */
+export const fmtDateTime = (ts: string) => dateTimeFmt.format(new Date(ts));
 
 export const meetingKindLabels: Record<string, string> = {
 	meeting: 'Möte',

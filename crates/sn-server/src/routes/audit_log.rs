@@ -68,8 +68,13 @@ fn describe(action: &str, detail: &serde_json::Value) -> String {
             format!("Öppnade personkortet ({})", parts.join(", "))
         }
         "person.national_id.reveal" => "Visade hela personnumret".into(),
-        "bulk.move" => "Flyttade till annan avdelning eller patrull".into(),
-        "bulk.admit" => "Tog in från väntelistan".into(),
+        "bulk.move" | "bulk.admit" => {
+            let verb = if action == "bulk.move" { "Flyttades" } else { "Togs in från väntelistan" };
+            match detail.get("to").and_then(serde_json::Value::as_str) {
+                Some(to) => format!("{verb} till {to}"),
+                None => verb.to_owned(),
+            }
+        }
         "grant.dak.export" => "Exporterade närvaro med personnummer till kommunen (DAK)".into(),
         "compat.memberlist" => {
             let name = detail.get("key_name").and_then(serde_json::Value::as_str).unwrap_or("okänd");
@@ -172,5 +177,14 @@ mod tests {
         let d = describe("person.read", &serde_json::json!({ "fields": { "contact": true, "personal": false } }));
         assert_eq!(d, "Öppnade personkortet (grunduppgifter, kontaktuppgifter)");
         assert_eq!(describe("person.national_id.reveal", &serde_json::json!({})), "Visade hela personnumret");
+        assert_eq!(
+            describe("bulk.move", &serde_json::json!({ "to": "Vargarna / Patrull Ugglan" })),
+            "Flyttades till Vargarna / Patrull Ugglan"
+        );
+        assert_eq!(describe("bulk.admit", &serde_json::json!({})), "Togs in från väntelistan");
+        assert_eq!(
+            describe("compat.memberlist", &serde_json::json!({ "key_name": "Skojjt", "ssno": true })),
+            "Hämtades av integrationen «Skojjt» (grunduppgifter, personnummer)"
+        );
     }
 }

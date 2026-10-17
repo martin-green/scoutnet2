@@ -10,7 +10,8 @@
 		vantelista: 'Väntelista',
 		organisation: 'Organisation',
 		narvaro: 'Närvaro',
-		bidrag: 'Bidrag'
+		bidrag: 'Bidrag',
+		integrationer: 'Integrationer'
 	};
 	// Undersidor efter /[kind]/[nr]. Dynamiska delar (t.ex. ett möte) får sin etikett från sidans data (`crumb`).
 	const crumbs = $derived.by(() => {

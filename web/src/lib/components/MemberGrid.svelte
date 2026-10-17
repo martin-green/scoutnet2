@@ -15,10 +15,17 @@
 		type MemberRow,
 		type SavedView
 	} from '#lib/api/client.ts';
+	import { SvelteSet } from 'svelte/reactivity';
+	import BulkDialog from './BulkDialog.svelte';
 	import PersonPanel from './PersonPanel.svelte';
 
 	type Preset = 'members' | 'waiting';
-	let { bodyId, preset = 'members', troops = [] }: { bodyId: string; preset?: Preset; troops?: BodyChild[] } = $props();
+	let {
+		bodyId,
+		preset = 'members',
+		troops = [],
+		canManage = false
+	}: { bodyId: string; preset?: Preset; troops?: BodyChild[]; canManage?: boolean } = $props();
 
 	type Col = { key: string; label: string; sort?: string; on: boolean; align?: 'right'; only?: Preset };
 	const allColumns: Col[] = [
@@ -73,11 +80,13 @@
 	let loading = $state(false);
 	let error = $state<string | null>(null);
 	let selected = $state<string | null>(null);
+	let reload = $state(0);
 	let seq = 0;
 
 	$effect(() => {
 		const query = effective.toString();
 		const id = bodyId;
+		void reload;
 		const mine = ++seq;
 		loading = true;
 		api.members(id, new URLSearchParams(query))
@@ -102,7 +111,39 @@
 			else u.searchParams.set(k, v);
 		}
 		if (!('offset' in changes)) u.searchParams.delete('offset');
+		// Ett nytt filter ger ett nytt urval; byte av sida eller sortering behåller det.
+		if (Object.keys(changes).some((k) => !['offset', 'limit', 'sort'].includes(k))) picked.clear();
 		goto(u, { replace: true, reset: false });
+	}
+
+	// Urval för massåtgärder. Shift-klick markerar ett intervall på sidan.
+	const picked = new SvelteSet<string>();
+	let lastPicked = -1;
+	let bulkAction = $state<'move' | 'admit' | null>(null);
+	const pageIds = $derived((data?.items ?? []).map((r) => r.id));
+	const allOnPage = $derived(pageIds.length > 0 && pageIds.every((id) => picked.has(id)));
+	const someOnPage = $derived(pageIds.some((id) => picked.has(id)));
+	function togglePick(i: number, e: MouseEvent) {
+		const id = pageIds[i];
+		const on = !picked.has(id);
+		const [from, to] = e.shiftKey && lastPicked >= 0 ? [Math.min(lastPicked, i), Math.max(lastPicked, i)] : [i, i];
+		for (const pid of pageIds.slice(from, to + 1)) {
+			if (on) picked.add(pid);
+			else picked.delete(pid);
+		}
+		lastPicked = i;
+	}
+	function togglePage() {
+		const on = !allOnPage;
+		for (const id of pageIds) {
+			if (on) picked.add(id);
+			else picked.delete(id);
+		}
+	}
+	function bulkDone() {
+		bulkAction = null;
+		picked.clear();
+		reload++;
 	}
 
 	// Fritextsök med fördröjning.
@@ -318,10 +359,35 @@
 		<p class="notice error">Kunde inte hämta: {error}</p>
 	{/if}
 
+	{#if canManage && picked.size > 0}
+		<div class="bulkbar" role="toolbar" aria-label="Massåtgärder">
+			<strong>{picked.size} valda</strong>
+			{#if preset === 'waiting'}
+				<button class="btn primary small" onclick={() => (bulkAction = 'admit')} disabled={troops.length === 0}>Ta in i avdelning…</button>
+			{:else}
+				<button class="btn primary small" onclick={() => (bulkAction = 'move')} disabled={troops.length === 0}>Flytta till avdelning…</button>
+			{/if}
+			<button class="btn ghost small" onclick={() => picked.clear()}>Avmarkera</button>
+		</div>
+	{/if}
+
 	<div class="table-scroll" class:loading>
 		<table>
 			<thead>
 				<tr>
+					{#if canManage}
+						<th class="pick">
+							<input
+								type="checkbox"
+								checked={allOnPage}
+								{@attach (el: HTMLInputElement) => {
+									el.indeterminate = someOnPage && !allOnPage;
+								}}
+								onchange={togglePage}
+								aria-label="Markera alla på sidan"
+							/>
+						</th>
+					{/if}
 					{#each shown as c (c.key)}
 						{@const s = sortState(c)}
 						<th class:sortable={!!c.sort} class:right={c.align === 'right'} aria-sort={s ? (s.dir === '▲' ? 'ascending' : 'descending') : undefined}>
@@ -338,8 +404,18 @@
 				</tr>
 			</thead>
 			<tbody>
-				{#each data?.items ?? [] as r (rowKey(r))}
-					<tr class:selected={selected === r.id} onclick={() => (selected = r.id)}>
+				{#each data?.items ?? [] as r, i (rowKey(r))}
+					<tr class:selected={selected === r.id} class:picked={picked.has(r.id)} onclick={() => (selected = r.id)}>
+						{#if canManage}
+							<td class="pick" onclick={(e) => e.stopPropagation()}>
+								<input
+									type="checkbox"
+									checked={picked.has(r.id)}
+									onclick={(e) => togglePick(i, e)}
+									aria-label={`Markera ${r.first_name} ${r.last_name}`}
+								/>
+							</td>
+						{/if}
 						{#each shown as c (c.key)}
 							<td class:right={c.align === 'right'}>
 								{#if c.key === 'name'}
@@ -413,7 +489,7 @@
 					</tr>
 				{:else}
 					{#if !loading}
-						<tr><td colspan={shown.length} class="empty">Inga träffar. Prova att ändra filtren.</td></tr>
+						<tr><td colspan={shown.length + (canManage ? 1 : 0)} class="empty">Inga träffar. Prova att ändra filtren.</td></tr>
 					{/if}
 				{/each}
 			</tbody>
@@ -443,7 +519,18 @@
 	<PersonPanel id={selected} onclose={() => (selected = null)} onopen={(pid) => (selected = pid)} />
 {/if}
 
-<svelte:window onkeydown={(e) => e.key === 'Escape' && ((selected = null), (showColumns = false))} />
+{#if bulkAction}
+	<BulkDialog
+		groupId={bodyId}
+		action={bulkAction}
+		personIds={[...picked]}
+		{troops}
+		onclose={() => (bulkAction = null)}
+		ondone={bulkDone}
+	/>
+{/if}
+
+<svelte:window onkeydown={(e) => e.key === 'Escape' && ((selected = null), (showColumns = false), (bulkAction = null))} />
 
 <style>
 	.grid-wrap {
@@ -606,6 +693,31 @@
 	}
 	tr.selected {
 		background: var(--sn-blue-100) !important;
+	}
+	tr.picked {
+		background: var(--sn-accent-50);
+	}
+	th.pick,
+	td.pick {
+		width: 36px;
+		padding-right: 0;
+		cursor: default;
+	}
+	.pick input {
+		width: 16px;
+		height: 16px;
+		cursor: pointer;
+	}
+	.bulkbar {
+		display: flex;
+		align-items: center;
+		gap: var(--space-2);
+		margin: 0 var(--space-4) var(--space-3);
+		padding: var(--space-2) var(--space-3);
+		background: var(--sn-blue-50);
+		border: 1px solid var(--sn-blue-100);
+		border-radius: var(--radius-sm);
+		font-size: 0.9rem;
 	}
 	.link {
 		border: none;

@@ -262,7 +262,7 @@ pub async fn bulk(
             &format!("bulk.{}", req.action),
             "body",
             group_id,
-            serde_json::json!({ "persons": persons, "troop": req.troop_id, "patrol": req.patrol_id }),
+            serde_json::json!({ "persons": persons, "troop": req.troop_id, "patrol": req.patrol_id, "to": to }),
         )
         .await;
     }

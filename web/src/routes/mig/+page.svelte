@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { api, ApiError, feeStatusLabels, fmtDate, fmtSek, policeCheckLabels, type PersonDetail } from '#lib/api/client.ts';
 	import { bodyHref } from '#lib/bodies.ts';
+	import AuditList from '#lib/components/AuditList.svelte';
 	import PersonPanel from '#lib/components/PersonPanel.svelte';
 	import { session } from '#lib/session.svelte.ts';
 
@@ -75,9 +76,9 @@
 				</ul>
 			{/if}
 			<h2>Integritet</h2>
-			<p class="muted">
-				Kommer vecka 5: se vem som har tittat på dina uppgifter (revisionsloggen), ladda ner dina uppgifter (registerutdrag) och hantera samtycken.
-			</p>
+			<h3 class="sub">Vem har sett mina uppgifter</h3>
+			<AuditList personId={session.me.person_id} self />
+			<p class="muted small">Kommer senare: ladda ner alla dina uppgifter (registerutdrag enligt GDPR) och hantera samtycken.</p>
 		</section>
 	</div>
 	{#if open && person}
@@ -101,5 +102,12 @@
 	}
 	dd {
 		margin: 0;
+	}
+	.sub {
+		font-size: 1rem;
+		margin: var(--space-2) 0;
+	}
+	.small {
+		font-size: 0.82rem;
 	}
 </style>
