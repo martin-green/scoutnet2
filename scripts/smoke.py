@@ -2,6 +2,7 @@
 
 Kör: python scripts/smoke.py   (servern ska vara igång på http://127.0.0.1:8080 med seedad data)
 """
+import base64
 import http.cookiejar
 import json
 import sys
@@ -247,6 +248,86 @@ check(call(leader, "DELETE", f"/v1/bodies/{tkey}/calendar", None, {"x-sn-csrf": 
       and call(anon, "GET", sub2["url"].removeprefix(BASE))[0] == 404 and call(anon, "GET", "/ical/abc.ics")[0] == 404,
       "återkallad eller ogiltig kalenderadress ger 404")
 
+# Massåtgärder (vecka 5). Torrkörning ändrar inget; flytten görs och återställs.
+csrf = {"x-sn-csrf": "1"}
+st, tl, _ = call(reg, "GET", f"/v1/bodies/{key}/descendants?kind=troop")
+troop_ids = [n["id"] for n in tl["items"] if n.get("troop_type") not in (None, "annan")]
+st, wl, _ = call(reg, "GET", f"/v1/bodies/{group_id}/members?status=waiting&sort=waiting_since&limit=2")
+wait_ids = [r["id"] for r in wl["items"]]
+st, dry, _ = call(reg, "POST", f"/v1/bodies/{key}/bulk",
+                  {"action": "admit", "person_ids": wait_ids, "troop_id": troop_ids[0], "dry_run": True}, csrf)
+_, body_after, _ = call(reg, "GET", f"/v1/bodies/{group_id}")
+check(st == 200 and dry["dry_run"] and dry["changed"] == len(wait_ids) and all(r["from"] == "Väntelista" for r in dry["rows"])
+      and body_after["counts"]["waiting"] == body["counts"]["waiting"],
+      f"torrkörning: {dry['changed']} skulle tas in från väntelistan, inget ändras")
+mover = next(r for r in page["items"] if not r["is_leader"] and r["troop"] and r["troop"]["id"] != troop_ids[-1])
+orig_troop = mover["troop"]["id"]
+orig_patrol = (mover.get("patrol") or {}).get("id")
+st, mv, _ = call(reg, "POST", f"/v1/bodies/{key}/bulk",
+                 {"action": "move", "person_ids": [mover["id"]], "troop_id": troop_ids[-1]}, csrf)
+_, moved, _ = call(reg, "GET", f"/v1/people/{mover['id']}")
+check(st == 200 and mv["changed"] == 1 and (moved.get("troop") or {}).get("id") == troop_ids[-1],
+      f"flytta {mv['rows'][0]['name']}: {mv['rows'][0]['from']} → {mv['rows'][0]['to']}")
+st, back, _ = call(reg, "POST", f"/v1/bodies/{key}/bulk",
+                   {"action": "move", "person_ids": [mover["id"]], "troop_id": orig_troop, "patrol_id": orig_patrol}, csrf)
+check(st == 200 and back["changed"] == 1, "flytten återställd")
+st, skip, _ = call(reg, "POST", f"/v1/bodies/{key}/bulk",
+                   {"action": "admit", "person_ids": [mover["id"]], "troop_id": troop_ids[0], "dry_run": True}, csrf)
+check(st == 200 and skip["changed"] == 0 and skip["rows"][0]["outcome"] == "skip", "aktiv medlem kan inte tas in igen (skip)")
+check(call(leader, "POST", f"/v1/bodies/{key}/bulk",
+           {"action": "move", "person_ids": [mover["id"]], "troop_id": orig_troop, "dry_run": True}, csrf)[0] == 404,
+      "avdelningsledare kan inte göra massåtgärder i kåren (404)")
+
+# Vem har sett mina uppgifter (revisionslogg per person)
+st, alog, _ = call(kar, "GET", f"/v1/people/{person}/audit")
+check(st == 200 and any(e["action"] == "person.national_id.reveal" for e in alog["entries"]) and alog["views_by_others"] > 0,
+      f"kårordförande ser loggen för en medlem: {len(alog['entries'])} händelser")
+_, mlog, _ = call(kar, "GET", f"/v1/people/{mover['id']}/audit")
+check(sum(e["action"] == "bulk.move" for e in mlog["entries"]) >= 2, "flyttarna syns i personens logg")
+check(call(reg, "GET", f"/v1/people/{person}/audit")[0] == 404, "registrerare saknar loggbehörighet (404)")
+
+# Scoutnet-kompatibelt API med API-nycklar (planen 6.4)
+def basic(user, pw):
+    return {"authorization": "Basic " + base64.b64encode(f"{user}:{pw}".encode()).decode()}
+
+
+gno = grp["body_number"]
+st, k1, _ = call(reg, "POST", f"/v1/bodies/{key}/api-keys",
+                 {"name": "Skojjt", "scopes": ["memberlist:contact", "memberlist:ssno"]}, csrf)
+check(st == 201 and k1["key"].startswith("sn2_") and k1["username"] == str(gno)
+      and k1["info"]["scopes"] == ["memberlist", "memberlist:contact", "memberlist:ssno"],
+      "skapa API-nyckel (visas en gång, memberlist läggs till)")
+st, ml, _ = call(anon, "GET", "/api/group/memberlist", None, basic(gno, k1["key"]))
+rows_ml = list((ml or {}).get("data", {}).values())
+check(st == 200 and len(rows_ml) == body["counts"]["active"] and "labels" in ml
+      and all(set(r["member_no"]) == {"value", "raw_value"} for r in rows_ml)
+      and any("ssno" in r for r in rows_ml) and any("email" in r for r in rows_ml),
+      f"Scoutnet-format via Basic: {len(rows_ml)} medlemmar med {{value, raw_value}}")
+st, mlw, _ = call(anon, "GET", "/api/group/memberlist?waiting=1", None, basic(gno, k1["key"]))
+check(st == 200 and len(mlw["data"]) == body["counts"]["waiting"], f"väntelistan: {len(mlw['data'])} st")
+st, _, hdrs = call(anon, "GET", f"/api/group/memberlist?id={gno}&key={k1['key']}")
+check(st == 200 and hdrs.get("deprecation"), "nyckel i frågan fungerar men markeras som avrådd (Deprecation)")
+st, _, hdrs = call(anon, "GET", "/api/group/memberlist", None, basic(gno, "sn2_fel"))
+check(st == 401 and hdrs.get("www-authenticate", "").startswith("Basic"), "fel nyckel ger 401")
+check(call(anon, "GET", "/api/group/memberlist", None, basic(gno + 1, k1["key"]))[0] == 401, "nyckeln gäller bara sin kår")
+check(call(kar, "POST", f"/v1/bodies/{key}/api-keys", {"name": "X", "scopes": ["memberlist:ssno"]}, csrf)[0] == 403,
+      "kårordförande kan inte ge en integration personnummer (403)")
+st, k2, _ = call(kar, "POST", f"/v1/bodies/{key}/api-keys", {"name": "Bara namn", "scopes": []}, csrf)
+_, ml2, _ = call(anon, "GET", "/api/group/memberlist", None, basic(gno, k2["key"]))
+check(st == 201 and not any("ssno" in r or "email" in r for r in ml2["data"].values()),
+      "nyckel utan extra behörigheter: inga personnummer eller kontaktuppgifter")
+st, keys, _ = call(reg, "GET", f"/v1/bodies/{key}/api-keys")
+check(st == 200 and {k1["info"]["id"], k2["info"]["id"]} <= {k["id"] for k in keys}
+      and all(k["last_used_at"] for k in keys if k["id"] == k1["info"]["id"]),
+      "nyckellistan visar senaste användning")
+check(call(leader, "GET", f"/v1/bodies/{key}/api-keys")[0] == 404, "avdelningsledare ser inte kårens nycklar")
+check(all(call(reg, "DELETE", f"/v1/api-keys/{k['info']['id']}", None, csrf)[0] == 204 for k in (k1, k2))
+      and call(anon, "GET", "/api/group/memberlist", None, basic(gno, k1["key"]))[0] == 401,
+      "återkallad nyckel slutar fungera direkt")
+_, plog, _ = call(kar, "GET", f"/v1/people/{person}/audit")
+check(any(e["action"] == "compat.memberlist" and "«Skojjt»" in e["description"] and "personnummer" in e["description"]
+          for e in plog["entries"]), "integrationens hämtningar syns i personens logg med namn")
+
 scout = login("Scout")
 st, sme, _ = call(scout, "GET", "/v1/me")
 check(st == 200 and not sme["contexts"], "scout utan roll har inga kontexter")
@@ -254,6 +335,9 @@ st, own, _ = call(scout, "GET", f"/v1/people/{sme['person_id']}")
 check(st == 200 and own["fees"] is not None and own["contact"] is not None and own["note"] is None,
       "scout ser sin egen profil inkl. egna avgifter, men inte interna anteckningar")
 check(call(scout, "GET", f"/v1/bodies/{group_id}/members")[0] == 404, "scout kan inte lista medlemmar")
+st, slog, _ = call(scout, "GET", f"/v1/people/{sme['person_id']}/audit")
+check(st == 200 and isinstance(slog["entries"], list) and call(scout, "GET", f"/v1/people/{person}/audit")[0] == 404,
+      f"scout ser vem som har sett hens uppgifter ({slog['views_by_others']} visningar), men inte andras logg")
 st, out, _ = call(scout, "POST", "/auth/logout", None, {"x-sn-csrf": "1"})
 check(st == 200 and out["logout_url"] is None and call(scout, "GET", "/v1/me")[0] == 401,
       "utloggning tar bort sessionen (personas: ingen ScoutID-utloggning)")

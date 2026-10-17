@@ -12,6 +12,7 @@ use axum::{
 };
 use sqlx::{PgPool, migrate::Migrator};
 use tower_http::{
+    catch_panic::CatchPanicLayer,
     compression::CompressionLayer,
     services::{ServeDir, ServeFile},
     set_header::SetResponseHeaderLayer,
@@ -101,5 +102,11 @@ pub fn app(state: &AppState) -> Router {
         app = app.fallback_service(spa);
     }
 
-    security_headers(app).layer(CompressionLayer::new()).layer(TraceLayer::new_for_http())
+    security_headers(app)
+        .layer(CompressionLayer::new())
+        // En panik i en hanterare ger 500 i stället för en stängd anslutning (och loggas av TraceLayer).
+        .layer(CatchPanicLayer::custom(|_| {
+            error::ApiError::Internal(anyhow::anyhow!("panik i hanterare")).into_response()
+        }))
+        .layer(TraceLayer::new_for_http())
 }

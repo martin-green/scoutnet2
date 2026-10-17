@@ -543,7 +543,13 @@ pub async fn dak_export(
         "grant.dak.export",
         "body",
         troop_id,
-        serde_json::json!({ "term": term.to_string(), "meetings": meetings.len(), "persons": people.len() }),
+        serde_json::json!({
+            "term": term.to_string(),
+            "meetings": meetings.len(),
+            "count": people.len(),
+            // Exakt vilka som fanns i filen, så att varje person kan se exporten i sin logg.
+            "persons": people.iter().map(|p| p.id).collect::<Vec<_>>(),
+        }),
     )
     .await;
     let filename = format!("DAK-avdelning-{troop_number}-{}.xml", term.to_string().replace(' ', ""));
