@@ -17,6 +17,7 @@ export type TroopAttendance = Schemas['TroopAttendanceSummary'];
 export type CreateMeetings = Schemas['CreateMeetings'];
 export type AttendanceStatus = 'present' | 'absent' | 'excused';
 export type SavedView = Schemas['SavedView'];
+export type GrantReport = Schemas['GrantReport'];
 export type MemberRow = Schemas['MemberRow'];
 export type MemberPage = Schemas['MemberPage'];
 export type PersonDetail = Schemas['PersonDetail'];
@@ -75,6 +76,8 @@ export const api = {
 	views: (id: string, list: string) => request<SavedView[]>('GET', `/v1/bodies/${id}/views?list=${list}`),
 	createView: (id: string, body: Schemas['CreateView']) => request<SavedView>('POST', `/v1/bodies/${id}/views`, body),
 	deleteView: (id: string) => request<void>('DELETE', `/v1/views/${id}`),
+	grants: (id: string, term?: string) =>
+		request<GrantReport>('GET', `/v1/bodies/${id}/grants${term ? `?term=${encodeURIComponent(term)}` : ''}`),
 	revealNationalId: (id: string) =>
 		request<{ national_id: string }>('POST', `/v1/people/${id}/reveal-national-id`),
 	personas: () => request<Persona[]>('GET', '/auth/dev/personas'),
@@ -245,3 +248,6 @@ export function shiftTerm(label: string, delta: number): string {
 
 const sek = new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', maximumFractionDigits: 0 });
 export const fmtSek = (ore: number) => sek.format(ore / 100);
+const sekExact = new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 2 });
+/** Belopp med ören, t.ex. "9,89 kr". */
+export const fmtSekExact = (ore: number) => sekExact.format(ore / 100);

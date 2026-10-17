@@ -33,6 +33,8 @@ use crate::{auth, routes};
         routes::views::list_views,
         routes::views::create_view,
         routes::views::delete_view,
+        routes::grants::grant_report,
+        routes::grants::dak_export,
         auth::dev_personas,
         auth::dev_login,
         auth::logout,
@@ -46,6 +48,7 @@ use crate::{auth, routes};
         (name = "members", description = "Medlemmar och personer"),
         (name = "attendance", description = "Möten och närvaro"),
         (name = "views", description = "Sparade vyer"),
+        (name = "grants", description = "Bidragsunderlag och DAK"),
         (name = "auth", description = "Inloggning och sessioner"),
     ),
     modifiers(&SessionCookie)

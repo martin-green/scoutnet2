@@ -200,6 +200,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/bodies/{id}/grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bidragsunderlag för en kår eller avdelning och termin: varje genomförd sammankomst kontrolleras
+         *     mot kommunens regler (ålder, antal deltagare och ledare, längd) och bidraget beräknas.
+         */
+        get: operations["grant_report"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/bodies/{id}/grants/dak": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * DAK-fil (Digitalt Aktivitetskort 2.2) för en avdelning och termin, att lämna till kommunen.
+         *     Innehåller personnummer: kräver `national_id_read` och färsk inloggning. Varje export loggas.
+         */
+        get: operations["dak_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/bodies/{id}/meetings": {
         parameters: {
             query?: never;
@@ -580,6 +620,51 @@ export interface components {
             role_key?: string | null;
             role_label?: string | null;
         };
+        GrantReport: {
+            /** Format: int64 */
+            amount_ore: number;
+            /** Format: int64 */
+            approved: number;
+            association_id?: string | null;
+            /** @description Om den inloggade får ladda ner DAK-filer (innehåller personnummer). */
+            can_export_dak: boolean;
+            /** @description Kåren som söker bidraget. */
+            group: components["schemas"]["BodyRef"];
+            /** Format: int64 */
+            held: number;
+            meetings: components["schemas"]["MeetingGrant"][];
+            municipality?: string | null;
+            municipality_code?: string | null;
+            /** @description Problem som hindrar ansökan (t.ex. kommun-ID saknas). */
+            problems: string[];
+            rules?: components["schemas"]["GrantRules"] | null;
+            term: string;
+            /** Format: int32 */
+            term_id: number;
+            troops: components["schemas"]["TroopGrant"][];
+        };
+        GrantRules: {
+            /** Format: int32 */
+            amount_per_female_ore: number;
+            /** Format: int32 */
+            amount_per_male_ore: number;
+            /** Format: int32 */
+            max_age: number;
+            /** Format: int32 */
+            min_age: number;
+            /** Format: int32 */
+            min_leader_age: number;
+            /** Format: int32 */
+            min_leaders: number;
+            /** Format: int32 */
+            min_minutes: number;
+            /** Format: int32 */
+            min_participants: number;
+            municipality_code: string;
+            name: string;
+            /** Format: int32 */
+            year: number;
+        };
         GuardianDto: {
             email?: string | null;
             has_account: boolean;
@@ -660,6 +745,46 @@ export interface components {
             /** Format: date-time */
             starts_at: string;
             /** @description Lokal starttid `HH:MM`. */
+            time: string;
+            troop: components["schemas"]["BodyRef"];
+        };
+        MeetingGrant: {
+            /** Format: int64 */
+            amount_ore: number;
+            approved: boolean;
+            /** Format: date */
+            date: string;
+            /** Format: int32 */
+            duration_min: number;
+            /**
+             * Format: int64
+             * @description Deltagare inom åldersgränserna och med giltigt personnummer.
+             */
+            eligible: number;
+            /** Format: int64 */
+            eligible_female: number;
+            /** Format: int64 */
+            eligible_male: number;
+            /** @description Varför sammankomsten inte godkänns, eller varningar. */
+            issues: string[];
+            kind: string;
+            /** Format: int64 */
+            leaders: number;
+            /** Format: uuid */
+            meeting_id: string;
+            /**
+             * Format: int64
+             * @description Närvarande som inte räknas för att personnummer saknas.
+             */
+            missing_national_id: number;
+            name: string;
+            /**
+             * Format: int64
+             * @description Närvarande deltagare (inte ledare).
+             */
+            participants: number;
+            /** Format: int64 */
+            qualifying_leaders: number;
             time: string;
             troop: components["schemas"]["BodyRef"];
         };
@@ -1065,6 +1190,15 @@ export interface components {
             troop_type?: string | null;
             troop_type_label?: string | null;
         };
+        TroopGrant: {
+            /** Format: int64 */
+            amount_ore: number;
+            /** Format: int64 */
+            approved: number;
+            /** Format: int64 */
+            held: number;
+            troop: components["schemas"]["BodyRef"];
+        };
         TroopRefDto: {
             /** Format: uuid */
             id: string;
@@ -1386,6 +1520,105 @@ export interface operations {
                 };
             };
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    grant_report: {
+        parameters: {
+            query?: {
+                /** @description Termin, t.ex. `HT2026`, `VT 2027` eller termins-id `20261`. Standard: innevarande termin. */
+                term?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Kårens eller avdelningens id eller nyckel */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GrantReport"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    dak_export: {
+        parameters: {
+            query?: {
+                /** @description Termin, t.ex. `HT2026`, `VT 2027` eller termins-id `20261`. Standard: innevarande termin. */
+                term?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Avdelningens id eller nyckel, t.ex. `troop-5003` */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description DAK-XML */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": unknown;
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

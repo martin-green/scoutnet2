@@ -7,6 +7,7 @@ use crate::AppState;
 
 pub mod attendance;
 pub mod bodies;
+pub mod grants;
 pub mod me;
 pub mod members;
 pub mod people;
@@ -30,6 +31,7 @@ pub fn router() -> Router<AppState> {
         .merge(people::router())
         .merge(attendance::router())
         .merge(views::router())
+        .merge(grants::router())
 }
 
 /// Registrerar en händelse i revisionsloggen. Fel här får inte stoppa läsningen,

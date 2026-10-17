@@ -117,7 +117,7 @@ pub struct TermQuery {
     pub term: Option<String>,
 }
 
-fn parse_term(term: Option<&str>) -> ApiResult<Term> {
+pub(super) fn parse_term(term: Option<&str>) -> ApiResult<Term> {
     match term.map(str::trim).filter(|t| !t.is_empty()) {
         None => Ok(Term::containing(chrono::Local::now().date_naive())),
         Some(t) if t.chars().all(|c| c.is_ascii_digit()) => {

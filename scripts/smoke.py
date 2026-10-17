@@ -25,7 +25,7 @@ def call(op, method, path, body=None, headers=None):
     try:
         with op.open(req) as r:
             raw = r.read()
-            is_json = r.headers.get("content-type", "").startswith("application/")
+            is_json = "json" in r.headers.get("content-type", "")
             return r.status, (json.loads(raw) if raw and is_json else raw), {k.lower(): v for k, v in r.headers.items()}
     except urllib.error.HTTPError as e:
         raw = e.read()
@@ -212,6 +212,25 @@ other_troop = next(t for t in summ["troops"] if t["troop"]["number"] != troop_ct
 check(call(leader, "GET", f"/v1/bodies/troop-{other_troop['troop']['number']}/attendance")[0] == 404
       and call(leader, "GET", f"/v1/meetings/{other_troop['last_meeting_id']}")[0] == 404,
       "avdelningsledare ser inte andra avdelningars närvaro")
+
+# Bidrag och DAK (vecka 4)
+st, gr, _ = call(reg, "GET", f"/v1/bodies/{key}/grants")
+check(st == 200 and gr["rules"] and gr["rules"]["municipality_code"] == "1480" and not gr["problems"]
+      and gr["held"] == len(gr["meetings"]) and 0 < gr["approved"] <= gr["held"]
+      and gr["amount_ore"] == sum(t["amount_ore"] for t in gr["troops"]) == sum(m["amount_ore"] for m in gr["meetings"]),
+      f"bidragsunderlag Göteborg: {gr['approved']}/{gr['held']} godkända, {gr['amount_ore'] / 100:.2f} kr")
+check(all(m["issues"] for m in gr["meetings"] if not m["approved"]), "underkända sammankomster har förklaring")
+st, xml, hdrs = call(reg, "GET", f"/v1/bodies/{tkey}/grants/dak")
+text = xml.decode() if isinstance(xml, bytes) else ""
+import re
+pnrs = re.findall(r"<Personnummer>(\d*)</Personnummer>", text)
+check(st == 200 and "attachment" in hdrs.get("content-disposition", "") and 'kommunID="1480"' in text
+      and 'version="2.2"' in text and pnrs and all(len(p) == 12 and p[8:10] in ("98", "99") for p in pnrs),
+      f"DAK 2.2-fil med {len(pnrs)} personer (testpersonnummer, 12 siffror)")
+st, lgr, _ = call(leader, "GET", f"/v1/bodies/{tkey}/grants")
+check(st == 200 and not lgr["can_export_dak"] and call(leader, "GET", f"/v1/bodies/{tkey}/grants/dak")[0] == 403,
+      "avdelningsledare ser underlaget men får inte ladda ner personnummer (403)")
+check(call(login("Distriktsordförande"), "GET", "/v1/bodies/district-1/grants")[0] == 400, "bidrag tas fram per kår eller avdelning")
 
 scout = login("Scout")
 st, sme, _ = call(scout, "GET", "/v1/me")

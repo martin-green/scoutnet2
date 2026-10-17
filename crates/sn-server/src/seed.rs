@@ -1373,6 +1373,16 @@ macro_rules! insert_rows {
 /// Realistiska tidsstämplar: personen registrerades när hen först kom in i kåren,
 /// och samtycken lämnades i samband med det.
 async fn realistic_timestamps(tx: &mut sqlx::Transaction<'_, Postgres>) -> anyhow::Result<()> {
+    // Kommunkod (SCB) och förenings-ID för bidragsunderlag (DAK). Förenings-ID = kårnummer i demon.
+    sqlx::query(
+        "UPDATE body SET municipality_code = CASE municipality
+             WHEN 'Göteborg' THEN '1480' WHEN 'Stockholm' THEN '0180' WHEN 'Uppsala' THEN '0380'
+             WHEN 'Malmö' THEN '1280' WHEN 'Umeå' THEN '2480' END,
+           association_id = CASE WHEN kind = 'group' THEN number::text END
+         WHERE municipality IS NOT NULL",
+    )
+    .execute(&mut **tx)
+    .await?;
     sqlx::query(
         "UPDATE person p SET created_at = s.first::timestamptz + interval '19 hours'
          FROM (SELECT person_id, min(coalesce(waiting_since, lower(valid))) AS first FROM membership GROUP BY person_id) s

@@ -58,7 +58,9 @@
 					...(permissions.includes('attendance_read') && current.kind !== 'patrol'
 						? [{ href: bodyHref(current, 'narvaro'), label: 'Närvaro', icon: '✅' }]
 						: []),
-					{ href: '', label: 'Bidrag', icon: '📄', soon: 'v.4' }
+					...(permissions.includes('reports_read') && ['group', 'troop'].includes(current.kind)
+						? [{ href: bodyHref(current, 'bidrag'), label: 'Bidrag', icon: '📄' }]
+						: [])
 				]
 			: []
 	);
@@ -99,19 +101,13 @@
 		<aside class="sidebar" aria-label="Huvudmeny">
 			<nav>
 				{#each nav as item (item.label)}
-					{#if item.soon}
-						<span class="navitem disabled" title="Kommer {item.soon}">
-							<span aria-hidden="true">{item.icon}</span>{item.label}<span class="badge">{item.soon}</span>
-						</span>
-					{:else}
-						<a
-							class="navitem"
-							class:active={page.url.pathname === item.href || (item.label !== 'Översikt' && page.url.pathname.startsWith(`${item.href}/`))}
-							href={item.href}
-						>
-							<span aria-hidden="true">{item.icon}</span>{item.label}
-						</a>
-					{/if}
+					<a
+						class="navitem"
+						class:active={page.url.pathname === item.href || (item.label !== 'Översikt' && page.url.pathname.startsWith(`${item.href}/`))}
+						href={item.href}
+					>
+						<span aria-hidden="true">{item.icon}</span>{item.label}
+					</a>
 				{/each}
 				<hr />
 				<a class="navitem" class:active={page.url.pathname === '/mig'} href="/mig"><span aria-hidden="true">🙂</span>Min profil</a>
@@ -229,13 +225,6 @@
 		color: var(--primary-strong);
 		font-weight: 600;
 		box-shadow: inset 3px 0 0 var(--primary);
-	}
-	.navitem.disabled {
-		color: var(--muted);
-		cursor: default;
-	}
-	.navitem.disabled .badge {
-		margin-left: auto;
 	}
 	hr {
 		border: none;
