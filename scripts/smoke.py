@@ -200,8 +200,38 @@ st, own, _ = call(scout, "GET", f"/v1/people/{sme['person_id']}")
 check(st == 200 and own["fees"] is not None and own["contact"] is not None and own["note"] is None,
       "scout ser sin egen profil inkl. egna avgifter, men inte interna anteckningar")
 check(call(scout, "GET", f"/v1/bodies/{group_id}/members")[0] == 404, "scout kan inte lista medlemmar")
-check(call(scout, "POST", "/auth/logout", None, {"x-sn-csrf": "1"})[0] == 204 and call(scout, "GET", "/v1/me")[0] == 401,
-      "utloggning tar bort sessionen")
+st, out, _ = call(scout, "POST", "/auth/logout", None, {"x-sn-csrf": "1"})
+check(st == 200 and out["logout_url"] is None and call(scout, "GET", "/v1/me")[0] == 401,
+      "utloggning tar bort sessionen (personas: ingen ScoutID-utloggning)")
+
+# Inloggning via ScoutID (OIDC). Hela flödet med Keycloak prövas i webbläsaren; här kontrolleras
+# att servern startar flödet korrekt och avvisar felaktiga återkomster.
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None
+
+
+def location(op, path):
+    try:
+        op.open(BASE + path)
+    except urllib.error.HTTPError as e:
+        return e.code, e.headers.get("location") or "", e.headers.get_all("set-cookie") or []
+    return 200, "", []
+
+
+nr = urllib.request.build_opener(NoRedirect, urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+st, cfg, _ = call(anon, "GET", "/auth/config")
+if st == 200 and cfg["scoutid"]:
+    code, loc, cookies = location(nr, "/auth/login?return_to=/kar/1001")
+    check(code == 303 and "code_challenge_method=S256" in loc and "nonce=" in loc and "state=" in loc
+          and any(c.startswith("sn_oidc=") and "HttpOnly" in c for c in cookies),
+          "ScoutID-inloggning startar med PKCE, state och nonce (state-cookie HttpOnly)")
+    code, loc, _ = location(nr, "/auth/callback?code=fejk&state=fel")
+    check(code == 303 and loc == "/login?fel=ogiltig", "återkomst med fel state avvisas")
+    code, loc, _ = location(nr, "/auth/callback?error=access_denied&state=x")
+    check(code == 303 and loc == "/login?fel=avbruten", "avbruten inloggning i ScoutID hanteras")
+else:
+    print("HOPPAR ÖVER ScoutID-kontroller (Keycloak körs inte: docker compose up -d keycloak)")
 
 st, spec, _ = call(anon, "GET", "/openapi.json")
 check(st == 200 and len(spec["paths"]) >= 8, f"OpenAPI: {len(spec['paths'])} sökvägar")

@@ -15,5 +15,18 @@ services:
       timeout: 3s
       retries: 30
 
+  # Lokal Keycloak som efterliknar nya ScoutID (realm "scoutid", claimet scoutnet_member_no).
+  # Endast för utveckling och demo. Testanvändare och lösenord finns i deploy/keycloak/README.md.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.5.0
+    command: ["start-dev", "--import-realm", "--http-port=8180", "--hostname=http://127.0.0.1:8180"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin-dev-only
+    ports:
+      - "127.0.0.1:8180:8180"
+    volumes:
+      - ./deploy/keycloak:/opt/keycloak/data/import:ro
+
 volumes:
   pgdata:

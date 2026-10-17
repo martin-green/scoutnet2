@@ -40,7 +40,7 @@ impl FromRequestParts<AppState> for CurrentUser {
     }
 }
 
-fn hash_token(token: &str) -> Vec<u8> {
+pub(crate) fn hash_token(token: &str) -> Vec<u8> {
     Sha256::digest(token.as_bytes()).to_vec()
 }
 
@@ -111,17 +111,26 @@ async fn load_principal(state: &AppState, token: &str) -> ApiResult<Option<Princ
 }
 
 /// Skapar en session och returnerar den slumpmässiga token som ska ligga i cookien.
-pub async fn create_session(state: &AppState, account_id: Uuid, auth_level: &str) -> ApiResult<String> {
+/// `auth_time` kommer från ScoutID (när användaren faktiskt autentiserade sig) och styr step-up.
+pub async fn create_session(
+    state: &AppState,
+    account_id: Uuid,
+    auth_level: &str,
+    auth_time: Option<DateTime<Utc>>,
+    id_token: Option<&str>,
+) -> ApiResult<String> {
     let mut bytes = [0u8; 32];
     getrandom::fill(&mut bytes).map_err(|e| anyhow::anyhow!("slumptal: {e}"))?;
     let token = hex::encode(bytes);
     sqlx::query(
-        "INSERT INTO session (token_hash, account_id, auth_level, expires_at)
-         VALUES ($1, $2, $3, now() + make_interval(hours => $4))",
+        "INSERT INTO session (token_hash, account_id, auth_level, auth_time, id_token, expires_at)
+         VALUES ($1, $2, $3, coalesce($4, now()), $5, now() + make_interval(hours => $6))",
     )
     .bind(hash_token(&token))
     .bind(account_id)
     .bind(auth_level)
+    .bind(auth_time)
+    .bind(id_token)
     .bind(i32::try_from(state.config.session_hours).unwrap_or(12))
     .execute(&state.db)
     .await?;
@@ -129,7 +138,7 @@ pub async fn create_session(state: &AppState, account_id: Uuid, auth_level: &str
     Ok(token)
 }
 
-fn session_cookie(state: &AppState, token: String) -> Cookie<'static> {
+pub(crate) fn session_cookie(state: &AppState, token: String) -> Cookie<'static> {
     Cookie::build((state.config.session_cookie_name(), token))
         .http_only(true)
         .secure(state.config.cookie_secure)
@@ -183,18 +192,33 @@ pub async fn dev_login(
     if exists.is_none() {
         return Err(ApiError::NotFound);
     }
-    let token = create_session(&state, req.account_id, "dev").await?;
+    let token = create_session(&state, req.account_id, "dev", None, None).await?;
     Ok((jar.add(session_cookie(&state, token)), StatusCode::NO_CONTENT))
 }
 
-/// Logga ut: tar bort sessionen på servern och cookien i webbläsaren.
-#[utoipa::path(post, path = "/auth/logout", tag = "auth", responses((status = 204)))]
+#[derive(Debug, Serialize, ToSchema)]
+pub struct LogoutResponse {
+    /// Om sessionen kom från ScoutID: adress för att logga ut även där (RP-initierad utloggning).
+    pub logout_url: Option<String>,
+}
+
+/// Logga ut: tar bort sessionen på servern och cookien i webbläsaren. Ger `logout_url` om
+/// användaren även ska loggas ut från ScoutID.
+#[utoipa::path(post, path = "/auth/logout", tag = "auth", responses((status = 200, body = LogoutResponse)))]
 pub async fn logout(State(state): State<AppState>, jar: CookieJar) -> ApiResult<impl IntoResponse> {
     let name = state.config.session_cookie_name();
+    let mut logout_url = None;
     if let Some(c) = jar.get(name) {
-        sqlx::query("DELETE FROM session WHERE token_hash = $1").bind(hash_token(c.value())).execute(&state.db).await?;
+        let id_token: Option<(Option<String>,)> =
+            sqlx::query_as("DELETE FROM session WHERE token_hash = $1 RETURNING id_token")
+                .bind(hash_token(c.value()))
+                .fetch_optional(&state.db)
+                .await?;
+        if let (Some((Some(id_token),)), Some(oidc)) = (id_token, state.oidc.as_ref()) {
+            logout_url = oidc.logout_url(&id_token).await;
+        }
     }
-    Ok((jar.remove(Cookie::build(name).path("/")), StatusCode::NO_CONTENT))
+    Ok((jar.remove(Cookie::build(name).path("/")), Json(LogoutResponse { logout_url })))
 }
 
 pub fn router() -> Router<AppState> {

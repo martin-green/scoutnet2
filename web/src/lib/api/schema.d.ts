@@ -4,6 +4,43 @@
  */
 
 export interface paths {
+    "/auth/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Återkomst från ScoutID: verifierar state, växlar koden mot tokens, verifierar ID-tokenet,
+         *     kopplar kontot och skapar en session.
+         */
+        get: operations["callback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Vilka inloggningssätt som finns. Används av inloggningssidan. */
+        get: operations["auth_config"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/dev/login": {
         parameters: {
             query?: never;
@@ -38,6 +75,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Startar inloggning via ScoutID: skapar state, nonce och PKCE och skickar webbläsaren till ScoutID. */
+        get: operations["login"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/logout": {
         parameters: {
             query?: never;
@@ -47,7 +101,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Logga ut: tar bort sessionen på servern och cookien i webbläsaren. */
+        /**
+         * Logga ut: tar bort sessionen på servern och cookien i webbläsaren. Ger `logout_url` om
+         *     användaren även ska loggas ut från ScoutID.
+         */
         post: operations["logout"];
         delete?: never;
         options?: never;
@@ -332,6 +389,12 @@ export interface components {
             /** @description Hela närvaron för mötet. Personer som inte finns med tas bort (idempotent helhetsuppdatering). */
             entries: components["schemas"]["AttendanceEntry"][];
         };
+        AuthConfig: {
+            /** @description Snabbinloggning med personas (endast utveckling och demo). */
+            dev_login: boolean;
+            /** @description Inloggning via ScoutID är konfigurerad och svarar. */
+            scoutid: boolean;
+        };
         BodyChildDto: {
             /** Format: int64 */
             active: number;
@@ -499,6 +562,10 @@ export interface components {
             /** Format: uuid */
             id: string;
             last_name: string;
+        };
+        LogoutResponse: {
+            /** @description Om sessionen kom från ScoutID: adress för att logga ut även där (RP-initierad utloggning). */
+            logout_url?: string | null;
         };
         MeResponse: {
             /** Format: uuid */
@@ -969,6 +1036,47 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    callback: {
+        parameters: {
+            query?: {
+                code?: string;
+                state?: string;
+                error?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Till appen eller inloggningssidan med felkod */
+            303: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    auth_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthConfig"];
+                };
+            };
+        };
+    };
     dev_login: {
         parameters: {
             query?: never;
@@ -1009,6 +1117,27 @@ export interface operations {
             };
         };
     };
+    login: {
+        parameters: {
+            query?: {
+                /** @description Sida att återvända till efter inloggning (relativ sökväg). */
+                return_to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Till ScoutID */
+            303: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     logout: {
         parameters: {
             query?: never;
@@ -1018,11 +1147,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["LogoutResponse"];
+                };
             };
         };
     };

@@ -26,7 +26,8 @@
 	$effect(() => {
 		if (isLogin) return;
 		session.load().then((me) => {
-			if (!me) goto('/login');
+			// Efter inloggning kommer man tillbaka till sidan man försökte öppna.
+			if (!me) goto(`/login?return_to=${encodeURIComponent(page.url.pathname + page.url.search)}`);
 		});
 	});
 
@@ -37,8 +38,9 @@
 	}
 
 	async function logout() {
-		await session.logout();
-		goto('/login');
+		const idpLogout = await session.logout();
+		if (idpLogout) window.location.assign(idpLogout);
+		else goto('/login');
 	}
 
 	const permissions = $derived<string[]>(

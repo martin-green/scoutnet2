@@ -18,9 +18,11 @@ class Session {
 		return this.me;
 	}
 
-	async logout() {
-		await api.logout();
+	/** Loggar ut. Ger en adress hos ScoutID om användaren även ska loggas ut där. */
+	async logout(): Promise<string | null> {
+		const res = await api.logout();
 		this.me = null;
+		return res?.logout_url ?? null;
 	}
 
 	can(bodyId: string, permission: string): boolean {

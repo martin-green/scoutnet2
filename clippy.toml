@@ -1,0 +1,2 @@
+# Namn som får stå utan backticks i dokumentationskommentarer (".." behåller Clippys standardlista).
+doc-valid-idents = ["ScoutID", "ScoutIDs", "OpenID", "PostgreSQL", ".."]

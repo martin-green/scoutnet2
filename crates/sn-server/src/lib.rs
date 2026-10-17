@@ -24,6 +24,7 @@ pub mod auth;
 pub mod authz;
 pub mod config;
 pub mod error;
+pub mod oidc;
 pub mod openapi;
 pub mod routes;
 pub mod seed;
@@ -36,6 +37,15 @@ pub static MIGRATOR: Migrator = sqlx::migrate!("./migrations");
 pub struct AppState {
     pub db: PgPool,
     pub config: Arc<Config>,
+    /// Inloggning via ScoutID, om konfigurerad.
+    pub oidc: Option<Arc<oidc::Oidc>>,
+}
+
+impl AppState {
+    pub fn new(db: PgPool, config: Config) -> anyhow::Result<Self> {
+        let oidc = config.oidc.clone().map(|c| oidc::Oidc::new(c, &config.public_url)).transpose()?.map(Arc::new);
+        Ok(Self { db, config: Arc::new(config), oidc })
+    }
 }
 
 async fn healthz(axum::extract::State(state): axum::extract::State<AppState>) -> impl IntoResponse {
@@ -77,6 +87,7 @@ pub fn app(state: &AppState) -> Router {
     let api = Router::new()
         .merge(routes::router())
         .merge(auth::router())
+        .merge(oidc::router())
         .layer(middleware::from_fn(csrf_guard))
         .layer(SetResponseHeaderLayer::overriding(header::CACHE_CONTROL, HeaderValue::from_static("no-store")))
         .route("/healthz", get(healthz))

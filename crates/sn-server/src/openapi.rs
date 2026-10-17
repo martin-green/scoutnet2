@@ -33,6 +33,9 @@ use crate::{auth, routes};
         auth::dev_personas,
         auth::dev_login,
         auth::logout,
+        crate::oidc::auth_config,
+        crate::oidc::login,
+        crate::oidc::callback,
     ),
     tags(
         (name = "me", description = "Inloggad användare"),

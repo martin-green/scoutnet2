@@ -75,7 +75,8 @@ export const api = {
 		request<{ national_id: string }>('POST', `/v1/people/${id}/reveal-national-id`),
 	personas: () => request<Persona[]>('GET', '/auth/dev/personas'),
 	devLogin: (account_id: string) => request<void>('POST', '/auth/dev/login', { account_id }),
-	logout: () => request<void>('POST', '/auth/logout')
+	logout: () => request<{ logout_url?: string | null } | undefined>('POST', '/auth/logout'),
+	authConfig: () => request<Schemas['AuthConfig']>('GET', '/auth/config')
 };
 
 export const troopTypes: { key: string; label: string }[] = [

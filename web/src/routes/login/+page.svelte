@@ -1,24 +1,40 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { api, type Persona } from '#lib/api/client.ts';
 	import { session } from '#lib/session.svelte.ts';
 
 	let personas = $state<Persona[]>([]);
 	let error = $state<string | null>(null);
 	let busy = $state<string | null>(null);
+	let config = $state<{ dev_login: boolean; scoutid: boolean } | null>(null);
 
 	$effect(() => {
-		api.personas()
-			.then((p) => (personas = p))
-			.catch(() => (error = 'Snabbinloggning är inte aktiverad på den här servern.'));
+		api.authConfig()
+			.then((c) => {
+				config = c;
+				if (c.dev_login) return api.personas().then((p) => (personas = p));
+			})
+			.catch(() => (error = 'Kunde inte nå servern.'));
 	});
+
+	const returnTo = $derived(page.url.searchParams.get('return_to') ?? '/');
+	const scoutidHref = $derived(`/auth/login?return_to=${encodeURIComponent(returnTo)}`);
+	const loginErrors: Record<string, string> = {
+		avbruten: 'Inloggningen avbröts i ScoutID.',
+		ogiltig: 'Inloggningen hade gått ut eller startades i en annan flik. Försök igen.',
+		okand: 'Ditt ScoutID är inte kopplat till någon medlem i Scoutnet 2. Kontakta kårens medlemsregistrerare.',
+		teknik: 'Något gick fel i kontakten med ScoutID. Försök igen om en stund.',
+		scoutid_nere: 'ScoutID svarar inte just nu. Försök igen om en stund.'
+	};
+	const loginError = $derived(loginErrors[page.url.searchParams.get('fel') ?? ''] ?? null);
 
 	async function login(p: Persona) {
 		busy = p.account_id;
 		try {
 			await api.devLogin(p.account_id);
 			await session.load();
-			goto('/');
+			goto(returnTo);
 		} finally {
 			busy = null;
 		}
@@ -50,14 +66,24 @@
 	</section>
 
 	<section class="card panel">
-		<button class="btn primary scoutid" disabled title="Kommer vecka 2: OIDC mot ScoutID (Keycloak)">
-			Logga in med ScoutID
-		</button>
-		<p class="muted small">
-			I produktion sker all inloggning via nya ScoutID med MFA. I demon väljer du en roll nedan.
-		</p>
+		{#if loginError}<p class="error" role="alert">{loginError}</p>{/if}
+		{#if config?.scoutid}
+			<a class="btn primary scoutid" href={scoutidHref}>Logga in med ScoutID</a>
+			<p class="muted small">
+				Lokal demo av ScoutID: logga in med ett medlemsnummer från <code>deploy/keycloak/README.md</code> och lösenordet
+				<code>scout</code>. I produktion sker all inloggning via nya ScoutID med MFA.
+			</p>
+		{:else}
+			<button class="btn primary scoutid" disabled title="ScoutID är inte konfigurerat eller svarar inte">Logga in med ScoutID</button>
+			<p class="muted small">
+				{config ? 'ScoutID svarar inte (starta den lokala Keycloaken med docker compose up -d).' : ''}
+				I produktion sker all inloggning via nya ScoutID med MFA.
+			</p>
+		{/if}
 
-		<h2>Demo – välj roll</h2>
+		{#if config?.dev_login}
+			<h2>Demo – välj roll</h2>
+		{/if}
 		{#if error}
 			<p class="error">{error}</p>
 		{/if}
@@ -115,9 +141,15 @@
 	}
 	.scoutid {
 		width: 100%;
+		display: flex;
 		justify-content: center;
+		box-sizing: border-box;
+		text-decoration: none;
 		padding: 12px;
 		font-size: 1.05rem;
+	}
+	code {
+		font-size: 0.85em;
 	}
 	.small {
 		font-size: 0.85rem;

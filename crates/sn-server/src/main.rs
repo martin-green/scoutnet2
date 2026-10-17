@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use anyhow::Context;
 use sn_server::{AppState, Config, MIGRATOR, app};
 use sqlx::postgres::PgPoolOptions;
@@ -24,7 +22,7 @@ async fn main() -> anyhow::Result<()> {
     MIGRATOR.run(&db).await.context("migrering misslyckades")?;
 
     let bind = config.bind;
-    let state = AppState { db, config: Arc::new(config) };
+    let state = AppState::new(db, config)?;
     let listener = TcpListener::bind(bind).await?;
     tracing::info!("Scoutnet 2 lyssnar på http://{bind}  (API-dokumentation: http://{bind}/docs)");
     axum::serve(listener, app(&state)).with_graceful_shutdown(shutdown()).await?;

@@ -1,0 +1,211 @@
+{
+  "realm": "scoutid",
+  "enabled": true,
+  "displayName": "ScoutID (lokal demo)",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "internationalizationEnabled": true,
+  "supportedLocales": [
+    "sv",
+    "en"
+  ],
+  "defaultLocale": "sv",
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 3600,
+  "clients": [
+    {
+      "clientId": "scoutnet2-web",
+      "name": "Scoutnet 2 (prototyp)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "scoutnet2-dev-secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "frontchannelLogout": false,
+      "redirectUris": [
+        "http://127.0.0.1:8080/auth/callback",
+        "http://localhost:8080/auth/callback"
+      ],
+      "webOrigins": [
+        "+"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://127.0.0.1:8080/login##http://localhost:8080/login"
+      },
+      "protocolMappers": [
+        {
+          "name": "scoutnet_member_no",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "config": {
+            "user.attribute": "username",
+            "claim.name": "scoutnet_member_no",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "9000115",
+      "enabled": true,
+      "email": "klara.forsberg.9000115@example.org",
+      "emailVerified": true,
+      "firstName": "Klara",
+      "lastName": "Forsberg",
+      "credentials": [
+        {
+          "type": "password",
+          "temporary": false,
+          "value": "scout"
+        }
+      ]
+    },
+    {
+      "username": "9000033",
+      "enabled": true,
+      "email": "helena.lindgren.9000033@example.org",
+      "emailVerified": true,
+      "firstName": "Helena",
+      "lastName": "Lindgren",
+      "credentials": [
+        {
+          "type": "password",
+          "temporary": false,
+          "value": "scout"
+        }
+      ]
+    },
+    {
+      "username": "9000114",
+      "enabled": true,
+      "email": "hugo.lindstrom.9000114@example.org",
+      "emailVerified": true,
+      "firstName": "Hugo",
+      "lastName": "Lindström",
+      "credentials": [
+        {
+          "type": "password",
+          "temporary": false,
+          "value": "scout"
+        }
+      ]
+    },
+    {
+      "username": "9000117",
+      "enabled": true,
+      "email": "magnus.jonsson.9000117@example.org",
+      "emailVerified": true,
+      "firstName": "Magnus",
+      "lastName": "Jonsson",
+      "credentials": [
+        {
+          "type": "password",
+          "temporary": false,
+          "value": "scout"
+        }
+      ]
+    },
+    {
+      "username": "9000118",
+      "enabled": true,
+      "email": "alma.andersson.9000118@example.org",
+      "emailVerified": true,
+      "firstName": "Alma",
+      "lastName": "Andersson",
+      "credentials": [
+        {
+          "type": "password",
+          "temporary": false,
+          "value": "scout"
+        }
+      ]
+    },
+    {
+      "username": "9000078",
+      "enabled": true,
+      "email": "theo.hansson.9000078@example.org",
+      "emailVerified": true,
+      "firstName": "Theo",
+      "lastName": "Hansson",
+      "credentials": [
+        {
+          "type": "password",
+          "temporary": false,
+          "value": "scout"
+        }
+      ]
+    },
+    {
+      "username": "9000080",
+      "enabled": true,
+      "email": "ella.sandberg.9000080@example.org",
+      "emailVerified": true,
+      "firstName": "Ella",
+      "lastName": "Sandberg",
+      "credentials": [
+        {
+          "type": "password",
+          "temporary": false,
+          "value": "scout"
+        }
+      ]
+    },
+    {
+      "username": "9002549",
+      "enabled": true,
+      "email": "eva.gustafsson.9002549@example.org",
+      "emailVerified": true,
+      "firstName": "Eva",
+      "lastName": "Gustafsson",
+      "credentials": [
+        {
+          "type": "password",
+          "temporary": false,
+          "value": "scout"
+        }
+      ]
+    },
+    {
+      "username": "9000041",
+      "enabled": true,
+      "email": "emma.gustafsson.9000041@example.org",
+      "emailVerified": true,
+      "firstName": "Emma",
+      "lastName": "Gustafsson",
+      "credentials": [
+        {
+          "type": "password",
+          "temporary": false,
+          "value": "scout"
+        }
+      ]
+    },
+    {
+      "username": "9999999",
+      "enabled": true,
+      "email": "okand.testperson.9999999@example.org",
+      "emailVerified": true,
+      "firstName": "Okänd",
+      "lastName": "Testperson",
+      "credentials": [
+        {
+          "type": "password",
+          "temporary": false,
+          "value": "scout"
+        }
+      ]
+    }
+  ]
+}
