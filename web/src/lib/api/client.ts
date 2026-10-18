@@ -30,6 +30,10 @@ export type AuditLog = Schemas['AuditLog'];
 export type AuditEntry = Schemas['AuditEntry'];
 export type ApiKeyInfo = Schemas['ApiKeyInfo'];
 export type CreatedApiKey = Schemas['CreatedApiKey'];
+export type ModuleInfo = Schemas['ModuleInfo'];
+export type BodyModule = Schemas['BodyModule'];
+export type NavItem = Schemas['NavItem'];
+export type Statistics = Schemas['Statistics'];
 
 export class ApiError extends Error {
 	constructor(
@@ -94,11 +98,27 @@ export const api = {
 	createApiKey: (id: string, body: Schemas['CreateApiKey']) =>
 		request<CreatedApiKey>('POST', `/v1/bodies/${id}/api-keys`, body),
 	revokeApiKey: (id: string) => request<void>('DELETE', `/v1/api-keys/${id}`),
+	modules: () => request<ModuleInfo[]>('GET', '/v1/modules'),
+	bodyModules: (id: string) => request<BodyModule[]>('GET', `/v1/bodies/${id}/modules`),
+	/** `enabled: null` tar bort enhetens eget val, så att valet ärvs igen. */
+	setModule: (id: string, module: string, body: { enabled: boolean | null; locked?: boolean }) =>
+		request<BodyModule[]>('PUT', `/v1/bodies/${id}/modules/${module}`, body),
+	statistics: (id: string) => request<Statistics>('GET', `/v1/bodies/${id}/statistics`),
 	personas: () => request<Persona[]>('GET', '/auth/dev/personas'),
 	devLogin: (account_id: string) => request<void>('POST', '/auth/dev/login', { account_id }),
 	logout: () => request<{ logout_url?: string | null } | undefined>('POST', '/auth/logout'),
 	authConfig: () => request<Schemas['AuthConfig']>('GET', '/auth/config')
 };
+
+// Modulkatalogen ändras bara vid ny version, så den hämtas en gång per sidladdning.
+let catalog: Promise<ModuleInfo[]> | null = null;
+export function moduleCatalog(): Promise<ModuleInfo[]> {
+	catalog ??= api.modules().catch((e) => {
+		catalog = null;
+		throw e;
+	});
+	return catalog;
+}
 
 export const troopTypes: { key: string; label: string }[] = [
 	{ key: 'familj', label: 'Familj' },
@@ -125,7 +145,8 @@ export const permissionLabels: Record<string, string> = {
 	attendance_write: 'Registrera närvaro',
 	reports_read: 'Rapporter',
 	audit_read: 'Revisionslogg',
-	economy_read: 'Se avgifter och betalningar'
+	economy_read: 'Se avgifter och betalningar',
+	modules_manage: 'Välja moduler'
 };
 
 type Tone = '' | 'green' | 'red' | 'accent' | 'blue';

@@ -34,6 +34,7 @@ Från planen ([02-plan.md](./02-plan.md)):
 | Avdelning: närvaromatris för terminen | | 22 | 40 |
 | Kår: närvarosammanfattning | | 9 | 9 |
 | Kår: bidragsunderlag för terminen | | 13 | 22 |
+| Kår: statistik (modulen Statistik) | | 23 | 28 |
 | **Distrikt:** medlemslista, 100 rader | 2 934 | 36 | 45 |
 | Distrikt: ledare utan giltigt registerutdrag | | 35 | 41 |
 | **Förbund:** medlemslista, första sidan | 77 672 | 121 | 141 |
@@ -46,10 +47,11 @@ Från planen ([02-plan.md](./02-plan.md)):
 | Förbund: väntelista sorterad på väntetid | 10 833 | 48 | 57 |
 | Organisationsträd, två nivåer (812 enheter med antal) | 812 | 158 | 197 |
 | Alla avdelningar sorterade på antal scouter | 4 835 | 140 | 176 |
+| Förbund: statistik (medlemsutveckling, ålder, grenar, närvaro, väntelista) | | 176 | 188 |
 | Scoutnet-kompatibel `memberlist`, hela kåren | 119 | 26 | 42 |
 | **Samtidighet:** 16 klienter, blandade listor | 300 anrop | 68 | 148 |
 
-Genomströmning: **210 anrop per sekund** på en server. Alla scenarier har p95 under 250 ms. Allt en kår eller avdelning gör ligger under 50 ms.
+Genomströmning: **210 anrop per sekund** på en server. Alla scenarier har p95 under 250 ms. Allt en kår eller avdelning gör ligger under 50 ms. Raderna om statistik mättes 2026-10-18 efter att modulerna infördes, med samma metod.
 
 ## Vad som ändrades i vecka 6
 
@@ -72,6 +74,16 @@ Orsaker och åtgärder:
    - **Åtgärd:** medlemslistan körs i två steg. Urvalet med filter, sortering, sida och totalt antal räknar bara fram det som filter eller sortering behöver. Resten räknas för sidans rader.
    - Avgiftsuppslaget är en vanlig join, så att Postgres kan hash-joina vid stora urval.
 4. **Antal per enhet** (översikt, underenheter och träd) räknas på id via `current_placement`. Sökvägarna slås upp sist, i stället för att gå via personerna.
+
+## Moduler
+
+Moduler ([06-moduler.md](./06-moduler.md)) kontrolleras vid varje anrop till en modul: är modulen på för enheten? Det är två små frågor (enhetens sökväg och valen längs sökvägen), och skillnaden syns inte i mätningen: kårens medlemslista och närvaro har samma tider som före modulerna.
+
+Statistik för hela förbundet tog först **1 335 ms**. Tre ändringar gav **188 ms** (p95):
+
+- **Ett svep.** Totaler, åldrar och grenar räknas i en genomgång av medlemmarna.
+- **Grupperade giltighetstider.** Medlemsutvecklingen grupperar medlemskapen på giltighetstid innan varje terminsstart prövas, i stället för att sortera 430 000 rader.
+- **Samtidiga delfrågor.** De oberoende delarna körs samtidigt på olika anslutningar (`tokio::try_join!`).
 
 ## Kvar att göra inför produktion
 

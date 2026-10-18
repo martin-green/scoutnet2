@@ -24,7 +24,12 @@
 </header>
 
 {#key body.id}
-	<MemberGrid bodyId={body.id} {troops} canManage={body.kind === 'group' && body.permissions.includes('members_manage')} />
+	<MemberGrid
+		bodyId={body.id}
+		{troops}
+		canManage={body.kind === 'group' && body.permissions.includes('members_manage')}
+		modules={body.modules}
+	/>
 {/key}
 
 <style>

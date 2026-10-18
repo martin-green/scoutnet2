@@ -14,7 +14,7 @@ use sn_domain::{BodyKind, Term, TroopType};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use super::{BodyRef, audit, bodies::load_visible_body};
+use crate::routes::{BodyRef, audit, bodies::load_visible_body};
 use crate::{
     AppState,
     auth::CurrentUser,
@@ -117,7 +117,7 @@ pub struct TermQuery {
     pub term: Option<String>,
 }
 
-pub(super) fn parse_term(term: Option<&str>) -> ApiResult<Term> {
+pub fn parse_term(term: Option<&str>) -> ApiResult<Term> {
     match term.map(str::trim).filter(|t| !t.is_empty()) {
         None => Ok(Term::containing(chrono::Local::now().date_naive())),
         Some(t) if t.chars().all(|c| c.is_ascii_digit()) => {
@@ -146,6 +146,8 @@ async fn load_meeting(state: &AppState, user: &CurrentUser, id: Uuid, perm: Perm
     if !user.0.can(Permission::AttendanceRead, &row.troop_path) && !user.0.can(perm, &row.troop_path) {
         return Err(ApiError::NotFound);
     }
+    // Möten nås via sitt id och inte via enheten, så modulspärren kontrolleras här.
+    crate::modules::require(state, super::ID, &row.troop_path).await?;
     if !user.0.can(perm, &row.troop_path) {
         return Err(ApiError::Forbidden);
     }

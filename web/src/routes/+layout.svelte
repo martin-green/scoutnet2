@@ -46,6 +46,8 @@
 	const permissions = $derived<string[]>(
 		body?.permissions ?? contexts.find((c) => c.body_id === current?.id)?.permissions ?? []
 	);
+	// Kärnans menyval finns här. Modulernas kommer från servern (bara aktiva moduler som användaren får se).
+	const moduleNav = $derived(body?.nav ?? contexts.find((c) => c.body_id === current?.id)?.nav ?? []);
 	const nav = $derived(
 		current
 			? [
@@ -55,14 +57,9 @@
 						? [{ href: bodyHref(current, 'vantelista'), label: 'Väntelista', icon: '⏳' }]
 						: []),
 					...(current.kind !== 'patrol' ? [{ href: bodyHref(current, 'organisation'), label: 'Organisation', icon: '🌳' }] : []),
-					...(permissions.includes('attendance_read') && current.kind !== 'patrol'
-						? [{ href: bodyHref(current, 'narvaro'), label: 'Närvaro', icon: '✅' }]
-						: []),
-					...(permissions.includes('reports_read') && ['group', 'troop'].includes(current.kind)
-						? [{ href: bodyHref(current, 'bidrag'), label: 'Bidrag', icon: '📄' }]
-						: []),
-					...(permissions.includes('members_manage') && current.kind === 'group'
-						? [{ href: bodyHref(current, 'integrationer'), label: 'Integrationer', icon: '🔌' }]
+					...moduleNav.map((n) => ({ href: bodyHref(current, n.segment), label: n.label, icon: n.icon })),
+					...(permissions.includes('modules_manage') && !['troop', 'patrol', 'section'].includes(current.kind)
+						? [{ href: bodyHref(current, 'moduler'), label: 'Moduler', icon: '⚙️' }]
 						: [])
 				]
 			: []

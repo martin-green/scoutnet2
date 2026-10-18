@@ -16,7 +16,8 @@ use sn_domain::{Personnummer, Term};
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use super::{BodyRef, attendance::TermQuery, audit, bodies::load_visible_body};
+use crate::modules::attendance::{TermQuery, parse_term};
+use crate::routes::{BodyRef, audit, bodies::load_visible_body};
 use crate::{
     AppState,
     auth::CurrentUser,
@@ -272,7 +273,7 @@ pub async fn grant_report(
     Path(key): Path<String>,
     Query(q): Query<TermQuery>,
 ) -> ApiResult<Json<GrantReport>> {
-    let term = super::attendance::parse_term(q.term.as_deref())?;
+    let term = parse_term(q.term.as_deref())?;
     let (group, path, _) = load_scope(&state, &user, &key).await?;
     let rules = load_rules(&state, group.municipality_code.as_deref(), term.year()).await?;
     let (meetings, present) = load_meetings(&state, &path, term).await?;
@@ -484,7 +485,7 @@ pub async fn dak_export(
     Path(key): Path<String>,
     Query(q): Query<TermQuery>,
 ) -> ApiResult<Response> {
-    let term = super::attendance::parse_term(q.term.as_deref())?;
+    let term = parse_term(q.term.as_deref())?;
     let (group, path, is_troop) = load_scope(&state, &user, &key).await?;
     if !is_troop {
         return Err(ApiError::BadRequest("DAK-filer tas fram per avdelning".into()));

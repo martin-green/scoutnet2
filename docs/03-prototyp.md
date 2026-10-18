@@ -34,6 +34,7 @@ Följande ingår inte: fakturering och betalningar (terminsavgifternas status vi
 | 4 | **Bidrag:** Göteborgs regler för aktivitetsbidrag 2026 som data. Varje sammankomst kontrolleras (ålder, deltagare, ledare, längd) med förklaring, och bidraget beräknas per kår och avdelning. **DAK 2.2-export** per avdelning, med samma struktur som Skojjt, kräver behörighet att se personnummer och färsk inloggning. **iCal-prenumeration** med återkallbar token utan personuppgifter. Rökprov med 69 kontroller. |
 | 5 | **Massåtgärder:** markera i medlemslistan eller väntelistan (shift-klick för intervall) och flytta till en avdelning eller patrull, eller ta in från väntelistan. Förhandsgranskning per rad innan något ändras. **Vem har sett mina uppgifter:** varje medlem ser i Min profil vem som har öppnat personkortet, visat personnumret, flyttat personen eller hämtat uppgifterna via en integration. Kårordförande ser samma logg i personkortet. **Integrationer:** API-nycklar per kår med behörigheter (kontaktuppgifter och personnummer var för sig) och `GET /api/group/memberlist` i Scoutnets format, så att Skojjt och andra integrationer kan byta adress utan omskrivning. Rökprov med 90 kontroller. |
 | 6 | **Prestanda med 100 000 personer:** alla mätta anrop har p95 under 250 ms, och allt på kår- och avdelningsnivå under 50 ms ([mätresultat](./05-prestanda.md)). Läsmodellen `current_placement` (aktuell avdelning och patrull, uppdateras av triggers) ersätter två uppslag per person. Filter på en enhet kan nu använda index, och listor över hela förbundet räknar bara fram tunga fält för sidans rader. Den gamla frågan tog 1,9 s för en kår med 119 medlemmar, den nya tar 20 ms. |
+| 7 | **Moduler** ([06-moduler.md](./06-moduler.md)): Scoutnet 2 är en kärna och moduler som slås på och av per förbund, distrikt eller kår. Ett val ärvs nedåt, förbund och distrikt kan låsa, och beroenden kontrolleras (Bidrag kräver Närvaro). Närvaro, Bidrag och Integrationer är flyttade till moduler, och **Statistik** är en ny modul (medlemsutveckling, ålder och kön, scouter per ledare, närvaro per gren, väntelista). Menyn byggs av modulerna. En avstängd modul ger 404 `module_disabled`, och gamla länkar visar en förklaring. Fakturering, E-postlistor och Aktiviteter visas som planerade. Rökprov med 109 kontroller. |
 
 ## Demo-manus (utkast)
 
@@ -51,6 +52,8 @@ Följande ingår inte: fakturering och betalningar (terminsavgifternas status vi
 | 5d | Logga in som **scouten** (9000080): *Min profil* → "Vem har sett mina uppgifter" visar registrarens visning och integrationens hämtning med namn | Insyn för medlemmen (GDPR), revisionslogg |
 | 6 | Öppna `/docs` och kör samma anrop via API:t | API först |
 | 7 | Prestanda: kör `python scripts/perf.py` mot 100 000 syntetiska personer. Som **förbundsadministratör**: hela förbundets medlemslista, sök på namn och organisationsträdet. | Skalbarhet: kår under 25 ms, hela förbundet 120–200 ms ([mätresultat](./05-prestanda.md)) |
+| 8 | Som **kårordförande**: *Moduler*, stäng av Bidrag. Menyn ändras för kåren och dess avdelningar, och en gammal länk till Bidrag visar en förklaring. Försök stänga av Närvaro: "Bidrag kräver Närvaro". Slå på Bidrag igen. | Scoutnet 2 byggs av moduler som kåren väljer |
+| 8b | Som **distriktsordförande**: *Moduler* för distriktet, stäng av och lås Statistik. Visa att kåren ser "Låst av Älvstadens scoutdistrikt". Ta bort låset och öppna *Statistik* för distriktet och en kår. | Arv och låsning i organisationen, och en ny modul byggd på en dag |
 
 ## Demo-miljö och generalrepetition
 
@@ -71,7 +74,7 @@ Med `-Perf` startar det också en server med 100 000 personer på <http://127.0.
 Checklista, dagen före och en timme före:
 
 1. Kör `./scripts/demo.ps1 -Perf` med nätverk. Första gången hämtas Docker-avbilderna och beroendena, sedan behövs inget nätverk.
-2. I ett annat fönster: `python scripts/smoke.py` (91 kontroller, alla ska vara OK) och `python scripts/perf.py` (alla scenarier under 250 ms).
+2. I ett annat fönster: `python scripts/smoke.py` (109 kontroller, alla ska vara OK) och `python scripts/perf.py` (alla scenarier under 250 ms).
 3. Logga in en gång med ScoutID som 9000033 för att se att Keycloak svarar. Testkonton finns i [deploy/keycloak/README.md](../deploy/keycloak/README.md).
 4. Gå igenom manuset ovan med varje roll. Seeden ger samma personas och medlemsnummer varje dag, men övriga namn kan variera med datumet.
 5. Projektor: webbläsarens zoom på 125–150 %, ljust läge och ett eget webbläsarfönster utan andra flikar.
@@ -90,7 +93,7 @@ Checklista, dagen före och en timme före:
 
 ## Teknik i prototypen
 
-- **Backend:** Rust 1.99 (edition 2024), axum, tokio, sqlx (PostgreSQL 18), utoipa (OpenAPI 3.1) och Scalar. Crates: `sn-domain` (rena domäntyper) och `sn-server` (API, behörighet, seed).
+- **Backend:** Rust 1.99 (edition 2024), axum, tokio, sqlx (PostgreSQL 18), utoipa (OpenAPI 3.1) och Scalar. Crates: `sn-domain` (rena domäntyper) och `sn-server` (API, behörighet, seed). Funktionsområdena ligger som moduler i `sn-server/src/modules/` med ett gemensamt kontrakt ([06-moduler.md](./06-moduler.md)).
 - **Databas:** PostgreSQL 18 i Docker: `ltree` för organisationsträdet, `pg_trgm` för sök och den inbyggda `uuidv7()`. Läsmodellen `current_placement` hålls aktuell av triggers. Anslutningarna planerar varje fråga med de verkliga parametrarna (`plan_cache_mode = force_custom_plan`), eftersom samma fråga kan gälla en patrull eller hela förbundet.
 - **Frontend:** SvelteKit (Svelte 5, TypeScript) som SPA, med Vite-proxy mot API:t i utveckling.
 - **Inloggning:** sessionscookie (BFF). OIDC (authorization code + PKCE) mot ScoutID, i utveckling en lokal Keycloak i docker compose ([deploy/keycloak](../deploy/keycloak/README.md)). Personas för snabbinloggning i utvecklingsläge (`SN_DEV_LOGIN=true`).

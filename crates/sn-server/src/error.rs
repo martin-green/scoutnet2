@@ -34,6 +34,9 @@ pub enum ApiError {
     Conflict(String),
     #[error("kräver färsk inloggning med MFA")]
     StepUpRequired,
+    /// Modulen är av för enheten (se `modules`). Ger 404, eftersom funktionen inte finns där.
+    #[error("modulen är inte aktiverad")]
+    ModuleDisabled(String),
     #[error(transparent)]
     Database(#[from] sqlx::Error),
     #[error(transparent)]
@@ -51,10 +54,11 @@ impl IntoResponse for ApiError {
             Self::BadRequest(_) => (StatusCode::BAD_REQUEST, "bad_request"),
             Self::Conflict(_) => (StatusCode::CONFLICT, "conflict"),
             Self::StepUpRequired => (StatusCode::UNAUTHORIZED, "step_up_required"),
+            Self::ModuleDisabled(_) => (StatusCode::NOT_FOUND, "module_disabled"),
             Self::Database(_) | Self::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "internal"),
         };
         let detail = match &self {
-            Self::BadRequest(msg) | Self::Conflict(msg) => Some(msg.clone()),
+            Self::BadRequest(msg) | Self::Conflict(msg) | Self::ModuleDisabled(msg) => Some(msg.clone()),
             Self::Database(e) => {
                 tracing::error!(error = %e, "databasfel");
                 None

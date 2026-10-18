@@ -14,7 +14,7 @@ use serde::Serialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use super::bodies::load_visible_body;
+use crate::routes::bodies::load_visible_body;
 use crate::{
     AppState,
     auth::{CurrentUser, hash_token, load_grants},
@@ -130,7 +130,8 @@ pub async fn ical_feed(State(state): State<AppState>, Path(file): Path<String>) 
         auth_time: Utc::now(),
         grants: load_grants(&state.db, person_id).await?,
     };
-    if !principal.can(Permission::AttendanceRead, &path) {
+    if !principal.can(Permission::AttendanceRead, &path) || !crate::modules::is_active(&state, super::ID, &path).await?
+    {
         return Err(ApiError::NotFound);
     }
     let meetings = sqlx::query_as::<_, FeedMeeting>(

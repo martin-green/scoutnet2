@@ -2,7 +2,10 @@
 
 > Ett modernt, API-först medlemssystem för Scouterna, skrivet i Rust.
 > Bygger på analysen i [01-analys-av-scoutnet.md](./01-analys-av-scoutnet.md).
-> Version 0.5, 2026-10-17. Ett levande dokument där beslut dokumenteras som ADR:er i `docs/adr/`.
+> Version 0.6, 2026-10-18. Ett levande dokument där beslut dokumenteras som ADR:er i `docs/adr/`.
+>
+> **Ändringar i 0.6:**
+> - Scoutnet 2 byggs av en kärna och **moduler** (Närvaro, Bidrag, Statistik, Fakturering, E-postlistor, Aktiviteter …) som slås på per förbund, distrikt eller kår. Se [06-moduler.md](./06-moduler.md), 4.1 och ADR-016.
 >
 > **Ändringar i 0.5:**
 > - Läsbara adresser med Scoutnets nummer (`/kar/1001`, `/avdelning/5003`) som i Skojjt, UUID internt (6.1, 9.1, ADR-015).
@@ -174,6 +177,7 @@ flowchart LR
 ```
 
 - **En modulär monolit** i Rust som byggs som två binärer från samma workspace: `server` (HTTP och BFF) och `worker` (bakgrundsjobb). Domänmoduler har tydliga gränser (separata crates) så att de kan brytas ut senare vid behov. Mikrotjänster ger ingen nytta i den här skalan och ökar attackytan.
+- **Kärna och moduler.** Funktionsområden som Närvaro, Bidrag, Statistik, Fakturering, E-postlistor och Aktiviteter är moduler med ett gemensamt kontrakt. De slås på och av per förbund, distrikt eller kår, och ett val ärvs nedåt och kan låsas. Externa appar använder API:t med OAuth-scopes från ScoutID. Se [06-moduler.md](./06-moduler.md).
 - **Tillståndslösa API-poddar** skalar horisontellt. Sessioner och jobb ligger i PostgreSQL.
 - **Samma plattform som ScoutID** (AKS, ArgoCD, CloudNativePG, Prometheus/Loki/Grafana, Velero) ger Scouterna en driftmodell och ett kompetensbehov.
 - **ScoutID är den enda utfärdaren av tokens**, både för människor och maskiner. Scoutnet 2 är *relying party* och *resource server* och dessutom datakälla (IdP-API) för ScoutID:s Scoutnet-provider (se 7.2 och 12.5).
@@ -982,6 +986,7 @@ gantt
 | 013 | Lösenord och kontoprovisionering | Lösenorden flyttas till ScoutID via lat migrering. Konton förprovisioneras från Scoutnet 2 via Keycloak Admin API (händelsedrivet), med en skrivskyddad User Storage SPI som alternativ. Organisationsträdet speglas inte som Keycloak-grupper. |
 | 014 | Behörighetskälla | Scoutnet 2:s egen databas är källa för behörighet, inte token-claims. ScoutID:s `memberships`-claim matas från Scoutnet 2:s IdP-API, med storleksgräns, för andra relying parties. |
 | 015 | Identifierare i adresser | **Beslutat i prototypen:** UUID (v7) är primärnyckel och används i alla relationer och integrationer. Enheter har dessutom ett nummer som är unikt per typ, och som för migrerade enheter är Scoutnets id (samma som Skojjt). Webbens adresser använder numret (`/kar/1001`) och API:t godtar nyckeln `group-1001`. Personer adresseras bara med UUID. |
+| 016 | Moduler | **Beslutat i prototypen:** inbyggda moduler med ett gemensamt kontrakt (manifest och Rust-trait) i en modulär monolit, aktiverade per enhet med arv nedåt, låsning och beroenden. Regler som data för lokal variation (Wasm bara vid behov). Externa appar via API, OAuth-scopes och webhooks. Inga insticksprogram som laddas vid körning. Se [06-moduler.md](./06-moduler.md). |
 
 ## 19. Nästa 30 dagar
 
@@ -1037,7 +1042,7 @@ scoutnet2/
 └─ docs/                      # analys, plan, prototyp, fältkatalog, ADR:er, API-guider
 ```
 
-I prototypen är allt samlat i två crates: `sn-domain` (domäntyper) och `sn-server` (API, BFF, schema, seed). Uppdelningen ovan görs i fas 1, när gränserna har prövats.
+I prototypen är allt samlat i två crates: `sn-domain` (domäntyper) och `sn-server` (API, BFF, schema, seed). Modulerna (Närvaro, Bidrag, Statistik, Integrationer) ligger som kataloger i `sn-server/src/modules/` med ett gemensamt kontrakt. Uppdelningen ovan görs i fas 1, när gränserna har prövats: kärnans gränssnitt i en crate (`sn-core`) och varje modul i en egen crate ([06-moduler.md](./06-moduler.md), avsnitt 13).
 
 ## Bilaga B – Exempel på endpoints
 
@@ -1060,6 +1065,8 @@ I prototypen är allt samlat i två crates: `sn-domain` (domäntyper) och `sn-se
 | `POST /v1/bodies/{id}/bulk` | Massåtgärder i en kår (flytta, ta in från väntelista) med `dry_run` och resultat per rad |
 | `GET/POST /v1/bodies/{id}/api-keys` · `DELETE /v1/api-keys/{id}` | API-nycklar per kår med behörigheter (`memberlist`, `memberlist:contact`, `memberlist:ssno`) |
 | `GET /api/group/memberlist` | Kompatibilitet med dagens Scoutnet (`{value, raw_value}`), HTTP Basic med kårnummer och nyckel |
+| `GET /v1/modules` · `GET /v1/bodies/{id}/modules` · `PUT /v1/bodies/{id}/modules/{module}` | Modulkatalog och val av moduler per enhet (`{enabled, locked}`, `enabled: null` = ärv). En avstängd modul ger 404 `module_disabled`. |
+| `GET /v1/bodies/{id}/statistics` | Modul Statistik: medlemsutveckling, ålder och kön, grenar, närvaro och väntelista (bara antal) |
 | `POST /v1/grant-reports` | Generera bidragsunderlag (regeluppsättning, period, enheter) som asynkront jobb |
 | `GET/POST /v1/events` · `POST /v1/events/{id}/registrations` | Arrangemang och anmälningar |
 | `GET /v1/invoices` · `POST /v1/payments` | Fakturor och betalningar |

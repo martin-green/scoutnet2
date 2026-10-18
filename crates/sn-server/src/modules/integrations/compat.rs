@@ -21,7 +21,7 @@ use sn_domain::{Term, TroopType};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use super::{audit, bodies::load_visible_body};
+use crate::routes::{audit, bodies::load_visible_body};
 use crate::{
     AppState,
     auth::{CurrentUser, hash_token},
@@ -306,16 +306,23 @@ pub async fn memberlist(
 ) -> ApiResult<Response> {
     let Some((group_no, secret, via_query)) = credentials(&headers, &q) else { return Ok(unauthorized()) };
     let Ok(group_no) = group_no.trim().parse::<i32>() else { return Ok(unauthorized()) };
-    let key: Option<(Uuid, Uuid, Vec<String>, String)> = sqlx::query_as(
+    let key: Option<(Uuid, Uuid, Vec<String>, String, String)> = sqlx::query_as(
         "UPDATE api_key k SET last_used_at = now() FROM body b
          WHERE k.key_hash = $1 AND k.revoked_at IS NULL AND b.id = k.body_id AND b.kind = 'group' AND b.number = $2
-         RETURNING k.id, k.body_id, k.scopes, k.name",
+         RETURNING k.id, k.body_id, k.scopes, k.name, b.path::text",
     )
     .bind(hash_token(&secret))
     .bind(group_no)
     .fetch_optional(&state.db)
     .await?;
-    let Some((key_id, group_id, scopes, key_name)) = key else { return Ok(unauthorized()) };
+    let Some((key_id, group_id, scopes, key_name, group_path)) = key else { return Ok(unauthorized()) };
+    if !crate::modules::is_active(&state, super::ID, &group_path).await? {
+        return Ok((
+            StatusCode::FORBIDDEN,
+            Json(json!({ "error": "Modulen Integrationer är inte aktiverad för kåren" })),
+        )
+            .into_response());
+    }
     if !scopes.iter().any(|s| s == "memberlist") {
         return Ok(unauthorized());
     }

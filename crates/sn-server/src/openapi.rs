@@ -12,7 +12,9 @@ use crate::{auth, routes};
         version = "0.1.0",
         description = "API-först: allt som webbappen gör finns här. All data i prototypen är syntetisk.\n\n\
             Autentisering sker med sessionscookie (BFF) som skapas via ScoutID, eller med snabbinloggning i demoläge.\n\
-            Muterande anrop kräver headern `x-sn-csrf: 1`.",
+            Muterande anrop kräver headern `x-sn-csrf: 1`.\n\n\
+            Kärnan (organisation, medlemmar, personer) kompletteras av moduler som Närvaro, Bidrag och Statistik. \
+            En modul kan vara av för en enhet, och då ger dess anrop 404 med felkoden `module_disabled`.",
         license(name = "MIT", url = "https://opensource.org/licenses/MIT")
     ),
     paths(
@@ -23,26 +25,11 @@ use crate::{auth, routes};
         routes::members::list_members,
         routes::people::get_person,
         routes::people::reveal_national_id,
-        routes::attendance::attendance_summary,
-        routes::attendance::attendance_matrix,
-        routes::attendance::create_meetings,
-        routes::attendance::get_meeting,
-        routes::attendance::update_meeting,
-        routes::attendance::delete_meeting,
-        routes::attendance::put_attendance,
         routes::views::list_views,
         routes::views::create_view,
         routes::views::delete_view,
-        routes::grants::grant_report,
-        routes::grants::dak_export,
-        routes::calendar::create_calendar,
-        routes::calendar::delete_calendar,
         routes::bulk::bulk,
         routes::audit_log::person_audit,
-        routes::compat::list_keys,
-        routes::compat::create_key,
-        routes::compat::revoke_key,
-        routes::compat::memberlist,
         auth::dev_personas,
         auth::dev_login,
         auth::logout,
@@ -54,15 +41,17 @@ use crate::{auth, routes};
         (name = "me", description = "Inloggad användare"),
         (name = "organisation", description = "Organisationsträdet"),
         (name = "members", description = "Medlemmar och personer"),
-        (name = "attendance", description = "Möten och närvaro"),
         (name = "views", description = "Sparade vyer"),
-        (name = "grants", description = "Bidragsunderlag och DAK"),
-        (name = "integrations", description = "API-nycklar och Scoutnet-kompatibelt API"),
         (name = "auth", description = "Inloggning och sessioner"),
     ),
     modifiers(&SessionCookie)
 )]
 pub struct ApiDoc;
+
+/// Hela specifikationen: kärnan och alla inbyggda moduler.
+pub fn spec() -> utoipa::openapi::OpenApi {
+    ApiDoc::openapi().merge_from(crate::modules::openapi())
+}
 
 #[derive(Debug)]
 struct SessionCookie;

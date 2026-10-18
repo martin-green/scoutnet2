@@ -11,7 +11,9 @@
 		organisation: 'Organisation',
 		narvaro: 'Närvaro',
 		bidrag: 'Bidrag',
-		integrationer: 'Integrationer'
+		integrationer: 'Integrationer',
+		statistik: 'Statistik',
+		moduler: 'Moduler'
 	};
 	// Undersidor efter /[kind]/[nr]. Dynamiska delar (t.ex. ett möte) får sin etikett från sidans data (`crumb`).
 	const crumbs = $derived.by(() => {
@@ -30,6 +32,16 @@
 		return out;
 	});
 	const subLabel = $derived(crumbs.at(-1)?.label);
+
+	// En undersida som hör till en modul som är av för enheten visas inte. Länkar och bokmärken
+	// leder i stället till en förklaring.
+	const segment = $derived((page.route.id ?? '').split('/')[3] ?? '');
+	const inactive = $derived(
+		data.catalog.find((m) => m.nav.some((n) => n.segment === segment) && !data.body.modules.includes(m.id))
+	);
+	const canManageModules = $derived(
+		data.body.permissions.includes('modules_manage') && !['troop', 'patrol', 'section'].includes(data.body.kind)
+	);
 </script>
 
 <svelte:head>
@@ -66,9 +78,28 @@
 	</ol>
 </nav>
 
-{@render children()}
+{#if inactive}
+	<section class="card off">
+		<h1><span aria-hidden="true">{inactive.icon}</span> {inactive.name} är inte aktiverad</h1>
+		<p>Modulen {inactive.name} är av för {data.body.name}. {inactive.description}</p>
+		{#if canManageModules}
+			<a class="btn primary" href={bodyHref(data.body, 'moduler')}>Gå till Moduler</a>
+		{:else}
+			<p class="muted">Kårens ordförande, eller distriktet eller förbundet, väljer vilka moduler som används.</p>
+		{/if}
+	</section>
+{:else}
+	{@render children()}
+{/if}
 
 <style>
+	.off {
+		max-width: 640px;
+	}
+	.off h1 {
+		font-size: 1.4rem;
+		margin-top: 0;
+	}
 	.crumbs {
 		font-size: 0.85rem;
 		margin-bottom: var(--space-2);

@@ -364,6 +364,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/bodies/{id}/modules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Modulernas läge för en enhet, med varifrån valet kommer. */
+        get: operations["get_body_modules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/bodies/{id}/modules/{module}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Slår på eller av en modul för en enhet, eller återgår till det ärvda valet. Kräver `modules_manage`. */
+        put: operations["set_module"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/bodies/{id}/statistics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Statistik för en enhet och allt under den. Bara antal, inga personuppgifter. */
+        get: operations["statistics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/bodies/{id}/views": {
         parameters: {
             query?: never;
@@ -428,6 +479,23 @@ export interface paths {
         get?: never;
         /** Sparar närvaron för ett möte. Kräver `attendance_write`. Låsta (rapporterade) möten ger 409. */
         put: operations["put_attendance"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/modules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Alla moduler: inbyggda och planerade. */
+        get: operations["list_catalog"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -523,6 +591,18 @@ export interface components {
             /** Format: date */
             valid_to?: string | null;
         };
+        AgeGroup: {
+            /** Format: int64 */
+            female: number;
+            label: string;
+            /** Format: int64 */
+            male: number;
+            /**
+             * Format: int64
+             * @description Annat eller okänt kön.
+             */
+            other: number;
+        };
         ApiKeyInfo: {
             /** Format: date-time */
             created_at: string;
@@ -612,6 +692,11 @@ export interface components {
             /** @description Inloggning via ScoutID är konfigurerad och svarar. */
             scoutid: boolean;
         };
+        /**
+         * @description Om modulen går att använda eller bara är planerad (visas i katalogen men kan inte slås på).
+         * @enum {string}
+         */
+        Availability: "available" | "planned";
         BodyChildDto: {
             /** Format: int64 */
             active: number;
@@ -650,8 +735,12 @@ export interface components {
             meeting?: components["schemas"]["MeetingInfo"] | null;
             /** Format: int32 */
             min_age?: number | null;
+            /** @description Moduler som är på för enheten (id), t.ex. `attendance`. */
+            modules: string[];
             municipality?: string | null;
             name: string;
+            /** @description Modulernas menyval för den inloggade här. */
+            nav: components["schemas"]["NavItem"][];
             /**
              * Format: int32
              * @description Unikt per typ. Tillsammans med `kind` bildar det nyckeln `kind-number`, t.ex. `group-1001`.
@@ -661,6 +750,34 @@ export interface components {
             permissions: components["schemas"]["Permission"][];
             troop_type?: string | null;
             troop_type_label?: string | null;
+        };
+        /** @description En moduls läge för en enhet. */
+        BodyModule: {
+            availability: components["schemas"]["Availability"];
+            /** @description Om den inloggade får ändra valet här. */
+            can_change: boolean;
+            /** @description Om valet kan låsas här (förbund och distrikt). */
+            can_lock: boolean;
+            /** @description Valet utan hänsyn till beroenden. */
+            chosen: boolean;
+            /** @description Namnen på moduler som krävs. */
+            depends_on: string[];
+            description: string;
+            /** @description På för enheten, efter arv, låsning och beroenden. */
+            enabled: boolean;
+            icon: string;
+            id: string;
+            /** @description Överliggande enhet som har låst valet. */
+            locked_by?: string | null;
+            /** @description Valet är låst här för underliggande enheter. */
+            locked_here: boolean;
+            /** @description Namnen på moduler som krävs men inte är på. */
+            missing: string[];
+            name: string;
+            /** @description `default` (standardläge), `inherited` (från en överliggande enhet) eller `own` (valt här). */
+            source: string;
+            /** @description Enheten som valet ärvs från. */
+            source_body?: string | null;
         };
         /**
          * @description Kort referens till en enhet. `kind` och `number` bildar den läsbara nyckeln `kind-number`
@@ -738,6 +855,10 @@ export interface components {
             body_name: string;
             /** Format: int32 */
             body_number: number;
+            /** @description Moduler som är på för enheten. */
+            modules: string[];
+            /** @description Modulernas menyval för användaren här. */
+            nav: components["schemas"]["NavItem"][];
             permissions: components["schemas"]["Permission"][];
             roles: string[];
         };
@@ -806,6 +927,13 @@ export interface components {
         DevLoginRequest: {
             /** Format: uuid */
             account_id: string;
+        };
+        Flow: {
+            /** Format: int64 */
+            joined: number;
+            /** Format: int64 */
+            left: number;
+            term: string;
         };
         FollowUpDto: {
             body_name?: string | null;
@@ -1088,8 +1216,31 @@ export interface components {
             organizer?: string | null;
             place?: string | null;
         };
+        ModuleInfo: {
+            availability: components["schemas"]["Availability"];
+            default_enabled: boolean;
+            depends_on: string[];
+            description: string;
+            icon: string;
+            id: string;
+            name: string;
+            nav: components["schemas"]["ModuleNav"][];
+        };
+        ModuleNav: {
+            kinds: string[];
+            label: string;
+            permission: components["schemas"]["Permission"];
+            segment: string;
+        };
         NationalIdResponse: {
             national_id: string;
+        };
+        /** @description Ett menyval för den inloggade på en enhet. */
+        NavItem: {
+            icon: string;
+            label: string;
+            module: string;
+            segment: string;
         };
         NodeCounts: {
             /** Format: int64 */
@@ -1140,7 +1291,7 @@ export interface components {
             total: number;
         };
         /** @enum {string} */
-        Permission: "body_read" | "members_read" | "members_contact_read" | "personal_read" | "national_id_read" | "members_manage" | "attendance_read" | "attendance_write" | "reports_read" | "audit_read" | "economy_read";
+        Permission: "body_read" | "members_read" | "members_contact_read" | "personal_read" | "national_id_read" | "members_manage" | "attendance_read" | "attendance_write" | "reports_read" | "audit_read" | "economy_read" | "modules_manage";
         /**
          * @description Hela personkortet med alla fält som Scoutnet har. Grupper som den inloggade saknar
          *     behörighet för är `null` (se `docs/04-faltkatalog.md`).
@@ -1322,6 +1473,30 @@ export interface components {
             query: string;
             shared: boolean;
         };
+        SetModule: {
+            /** @description `true` eller `false`. `null` tar bort enhetens eget val, så att valet ärvs igen. */
+            enabled?: boolean | null;
+            /** @description Lås valet för underliggande enheter (förbund och distrikt). */
+            locked?: boolean;
+        };
+        Statistics: {
+            /** @description Aktiva medlemmar per åldersgrupp och kön. */
+            age_groups: components["schemas"]["AgeGroup"][];
+            /** @description Om närvaron är med (kräver modulen Närvaro). */
+            attendance_included: boolean;
+            /** @description Nya och avslutade medlemskap per termin, äldst först. Tom för avdelningar. */
+            flows: components["schemas"]["Flow"][];
+            term: string;
+            /** Format: double */
+            took_ms: number;
+            totals: components["schemas"]["Totals"];
+            /** @description Aktiva medlemmar vid varje terminsstart och i dag, äldst först. */
+            trend: components["schemas"]["TrendPoint"][];
+            /** @description Per åldersgren (avdelningstyp). */
+            troop_types: components["schemas"]["TroopTypeStats"][];
+            /** @description Väntelistan per önskad gren. Tom för avdelningar. */
+            waiting: components["schemas"]["WaitingStats"][];
+        };
         TermAttendanceSummary: {
             term: string;
             /** Format: int32 */
@@ -1347,6 +1522,27 @@ export interface components {
             term: string;
             /** Format: int32 */
             term_id: number;
+        };
+        Totals: {
+            /** Format: int64 */
+            active: number;
+            /** Format: int64 */
+            leaders: number;
+            /** Format: int64 */
+            pending: number;
+            /** Format: int64 */
+            scouts: number;
+            /** Format: int64 */
+            troops: number;
+            /** Format: int64 */
+            waiting: number;
+        };
+        TrendPoint: {
+            /** Format: int64 */
+            active: number;
+            /** Format: date */
+            date: string;
+            label: string;
         };
         TroopAttendanceSummary: {
             /**
@@ -1401,6 +1597,23 @@ export interface components {
             troop_type?: string | null;
             troop_type_label?: string | null;
         };
+        TroopTypeStats: {
+            /**
+             * Format: double
+             * @description Andel närvarande på terminens genomförda möten (0–1).
+             */
+            attendance_pct?: number | null;
+            label: string;
+            /** Format: int64 */
+            leaders: number;
+            /** Format: int64 */
+            scouts: number;
+            /** Format: double */
+            scouts_per_leader?: number | null;
+            troop_type: string;
+            /** Format: int64 */
+            troops: number;
+        };
         UpdateMeeting: {
             /** Format: date */
             date?: string | null;
@@ -1412,6 +1625,14 @@ export interface components {
             name?: string | null;
             /** @description `HH:MM`. */
             time?: string | null;
+        };
+        WaitingStats: {
+            /** Format: int64 */
+            count: number;
+            label: string;
+            /** Format: double */
+            median_days?: number | null;
+            troop_type?: string | null;
         };
     };
     responses: never;
@@ -2191,6 +2412,127 @@ export interface operations {
             };
         };
     };
+    get_body_modules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Enhetens id eller nyckel, t.ex. `group-1001` */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BodyModule"][];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    set_module: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Enhetens id eller nyckel */
+                id: string;
+                /** @description Modulens id, t.ex. `grants` */
+                module: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetModule"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BodyModule"][];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Låst av en överliggande enhet eller i konflikt med ett beroende */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    statistics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Enhetens id eller nyckel, t.ex. `group-1001` eller `district-1` */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Statistics"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     list_views: {
         parameters: {
             query: {
@@ -2458,6 +2800,33 @@ export interface operations {
                 };
             };
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    list_catalog: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModuleInfo"][];
+                };
+            };
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -29,7 +29,7 @@
 </header>
 
 {#key body.id}
-	<MemberGrid bodyId={body.id} preset="waiting" {troops} {canManage} />
+	<MemberGrid bodyId={body.id} preset="waiting" {troops} {canManage} modules={body.modules} />
 {/key}
 
 <style>

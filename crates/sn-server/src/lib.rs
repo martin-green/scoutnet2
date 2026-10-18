@@ -18,13 +18,13 @@ use tower_http::{
     set_header::SetResponseHeaderLayer,
     trace::TraceLayer,
 };
-use utoipa::OpenApi;
 use utoipa_scalar::{Scalar, Servable};
 
 pub mod auth;
 pub mod authz;
 pub mod config;
 pub mod error;
+pub mod modules;
 pub mod oidc;
 pub mod openapi;
 pub mod routes;
@@ -57,7 +57,7 @@ async fn healthz(axum::extract::State(state): axum::extract::State<AppState>) ->
 }
 
 async fn openapi_json() -> Json<utoipa::openapi::OpenApi> {
-    Json(openapi::ApiDoc::openapi())
+    Json(openapi::spec())
 }
 
 /// Muterande anrop kräver en egen header. Webbläsare kan inte skicka den
@@ -87,6 +87,7 @@ fn security_headers(router: Router) -> Router {
 pub fn app(state: &AppState) -> Router {
     let api = Router::new()
         .merge(routes::router())
+        .merge(modules::router(state))
         .merge(auth::router())
         .merge(oidc::router())
         .layer(middleware::from_fn(csrf_guard))
@@ -95,7 +96,7 @@ pub fn app(state: &AppState) -> Router {
         .route("/openapi.json", get(openapi_json))
         .with_state(state.clone());
 
-    let mut app = Router::new().merge(api).merge(Scalar::with_url("/docs", openapi::ApiDoc::openapi()));
+    let mut app = Router::new().merge(api).merge(Scalar::with_url("/docs", openapi::spec()));
 
     if let Some(dist) = state.config.web_dist.as_ref() {
         let spa = ServeDir::new(dist).fallback(ServeFile::new(dist.join("200.html")));

@@ -10,7 +10,8 @@
 	let attendance = $state<AttendanceSummary | null>(null);
 	$effect(() => {
 		const id = body.id;
-		const canAttendance = body.permissions.includes('attendance_read') && ['troop', 'group'].includes(body.kind);
+		const canAttendance =
+			body.modules.includes('attendance') && body.permissions.includes('attendance_read') && ['troop', 'group'].includes(body.kind);
 		let current = true;
 		children = [];
 		attendance = null;

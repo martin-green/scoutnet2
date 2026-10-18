@@ -44,6 +44,10 @@ pub struct BodyDto {
     pub counts: BodyCounts,
     /// Vad den inloggade får göra här.
     pub permissions: Vec<Permission>,
+    /// Moduler som är på för enheten (id), t.ex. `attendance`.
+    pub modules: Vec<String>,
+    /// Modulernas menyval för den inloggade här.
+    pub nav: Vec<crate::modules::NavItem>,
 }
 
 /// En överliggande enhet i brödsmulorna.
@@ -321,6 +325,8 @@ pub async fn get_body(
         _ => None,
     };
 
+    let (modules, nav) = crate::modules::for_body(&state, &user.0, &b.kind, &b.path).await?;
+
     Ok(Json(BodyDto {
         id: b.id,
         kind_label: kind_label(&b.kind),
@@ -336,6 +342,8 @@ pub async fn get_body(
         ancestors,
         counts,
         permissions: user.0.permissions_on(&b.path).into_iter().collect(),
+        modules,
+        nav,
     }))
 }
 

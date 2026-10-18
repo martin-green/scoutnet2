@@ -11,6 +11,7 @@ Förstudie och plan för ett modernt, API-först medlemssystem för Scouterna, s
 | [docs/03-prototyp.md](docs/03-prototyp.md) | Skunk works-prototyp på 6 veckor: mål, demo-manus, veckoplan och status |
 | [docs/04-faltkatalog.md](docs/04-faltkatalog.md) | Alla personfält i Scoutnet med motsvarighet i Scoutnet 2: API-namn, tabell, dataklass, behörighet och kompatibilitetsnamn |
 | [docs/05-prestanda.md](docs/05-prestanda.md) | Prestandamätning med 100 000 syntetiska personer: metod, resultat (p50/p95 per scenario) och åtgärder |
+| [docs/06-moduler.md](docs/06-moduler.md) | Moduler: kärna och moduler (Närvaro, Bidrag, Statistik, Fakturering, E-postlistor, Aktiviteter …), modulkontrakt, aktivering per enhet med arv och låsning, data, händelser, behörighet och externa appar |
 
 ## Status
 
@@ -35,6 +36,7 @@ cargo run -p sn-server --bin sn-server            # http://127.0.0.1:8080 (API, 
 - Storlek på testdata: `cargo run -p sn-server --bin seed -- --districts 4 --groups 5 --seed 42`.
 - Prestanda med 100 000 personer: seeda en separat databas med `--districts 28 --groups 28`, starta ett release-bygge och kör `python scripts/perf.py` (instruktioner i skriptet, resultat i [docs/05-prestanda.md](docs/05-prestanda.md)).
 - Integrationer: API-nycklar skapas per kår under *Integrationer*. `GET /api/group/memberlist` svarar i Scoutnets format (HTTP Basic: kårnummer och nyckel).
+- Moduler: Närvaro, Bidrag, Statistik och Integrationer slås på och av per kår, distrikt eller förbund under *Moduler*. Ny modul: se [docs/06-moduler.md](docs/06-moduler.md#lägga-till-en-modul).
 
 Konfiguration via miljövariabler: `DATABASE_URL`, `SN_BIND`, `SN_PUBLIC_URL`, `SN_COOKIE_SECURE`, `SN_SESSION_HOURS`, `SN_DEV_LOGIN` och för ScoutID `SN_OIDC_ISSUER`, `SN_OIDC_CLIENT_ID`, `SN_OIDC_CLIENT_SECRET` (se [config.rs](crates/sn-server/src/config.rs)). I utvecklingsläge pekar ScoutID som standard på den lokala Keycloaken, och `SN_OIDC_ISSUER=` (tomt) stänger av OIDC.
 

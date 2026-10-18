@@ -5,13 +5,9 @@ use uuid::Uuid;
 
 use crate::AppState;
 
-pub mod attendance;
 pub mod audit_log;
 pub mod bodies;
 pub mod bulk;
-pub mod calendar;
-pub mod compat;
-pub mod grants;
 pub mod me;
 pub mod members;
 pub mod people;
@@ -27,19 +23,16 @@ pub struct BodyRef {
     pub number: i32,
 }
 
+/// Kärnans anrop. Modulernas anrop finns i [`crate::modules::router`].
 pub fn router() -> Router<AppState> {
     Router::new()
         .merge(me::router())
         .merge(bodies::router())
         .merge(members::router())
         .merge(people::router())
-        .merge(attendance::router())
         .merge(views::router())
-        .merge(grants::router())
-        .merge(calendar::router())
         .merge(bulk::router())
         .merge(audit_log::router())
-        .merge(compat::router())
 }
 
 /// Registrerar en händelse i revisionsloggen. Fel här får inte stoppa läsningen,

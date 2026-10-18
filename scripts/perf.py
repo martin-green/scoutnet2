@@ -120,6 +120,7 @@ measure("Väntelista sorterad på väntetid", reg, f"/v1/bodies/{gkey}/members?s
 measure("Närvaromatris avdelning (termin)", leader, f"/v1/bodies/{tkey}/attendance")
 measure("Närvarosammanfattning kår", kar, f"/v1/bodies/{gkey}/attendance/summary")
 measure("Bidragsunderlag kår (termin)", kar, f"/v1/bodies/{gkey}/grants")
+measure("Statistik kår (modul)", kar, f"/v1/bodies/{gkey}/statistics")
 
 print(f"\nDistrikt ({district['body_name']})")
 measure("Medlemslista distrikt, 100 rader", dist, f"/v1/bodies/{district['body_id']}/members")
@@ -141,6 +142,7 @@ measure("Förbund: väntelista sorterad på väntetid", admin, f"/v1/bodies/{oke
 measure("Organisationsträd, två nivåer", admin, f"/v1/bodies/{okey}/descendants?depth=2")
 measure("Alla avdelningar sorterade på antal scouter", admin,
         f"/v1/bodies/{okey}/descendants?kind=troop&sort=-scouts&limit=100")
+measure("Statistik för hela förbundet (modul)", admin, f"/v1/bodies/{okey}/statistics", n=max(5, args.n // 3))
 
 print("\nIntegrationer")
 _, key = call(reg, "POST", f"/v1/bodies/{gkey}/api-keys", {"name": "perf", "scopes": ["memberlist:contact"]}, {"x-sn-csrf": "1"})

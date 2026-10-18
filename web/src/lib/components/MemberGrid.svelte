@@ -24,10 +24,12 @@
 		bodyId,
 		preset = 'members',
 		troops = [],
-		canManage = false
-	}: { bodyId: string; preset?: Preset; troops?: BodyChild[]; canManage?: boolean } = $props();
+		canManage = false,
+		modules = []
+	}: { bodyId: string; preset?: Preset; troops?: BodyChild[]; canManage?: boolean; modules?: string[] } = $props();
 
-	type Col = { key: string; label: string; sort?: string; on: boolean; align?: 'right'; only?: Preset };
+	// `module`: kolumnen kommer från en modul och visas bara när modulen är på för enheten.
+	type Col = { key: string; label: string; sort?: string; on: boolean; align?: 'right'; only?: Preset; module?: string };
 	const allColumns: Col[] = [
 		{ key: 'name', label: 'Namn', sort: 'name', on: true },
 		{ key: 'member_no', label: 'Medl.nr', sort: 'member_no', on: false, align: 'right' },
@@ -45,13 +47,15 @@
 		{ key: 'home_phone', label: 'Hemtelefon', on: false },
 		{ key: 'national_id', label: 'Personnummer', on: false },
 		{ key: 'guardians', label: 'Vårdnadshavare', on: true },
-		{ key: 'attendance', label: 'Närvaro', sort: 'attendance', on: true, only: 'members' },
+		{ key: 'attendance', label: 'Närvaro', sort: 'attendance', on: true, only: 'members', module: 'attendance' },
 		{ key: 'police_check', label: 'Registerutdrag', sort: 'police_check', on: true, only: 'members' },
 		{ key: 'fee', label: 'Terminsavgift', sort: 'fee', on: true, only: 'members' },
 		{ key: 'fee_group', label: 'Avgiftsgrupp', on: false, only: 'members' },
 		{ key: 'member_since', label: 'Medlem sedan', sort: 'member_since', on: false, only: 'members' }
 	];
-	const columns = $derived(allColumns.filter((c) => !c.only || c.only === preset));
+	const columns = $derived(
+		allColumns.filter((c) => (!c.only || c.only === preset) && (!c.module || modules.includes(c.module)))
+	);
 	const storageKey = $derived(`sn2.columns.${preset}`);
 
 	function initialVisible(): Record<string, boolean> {

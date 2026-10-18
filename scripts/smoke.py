@@ -332,6 +332,69 @@ _, plog, _ = call(kar, "GET", f"/v1/people/{person}/audit")
 check(any(e["action"] == "compat.memberlist" and "«Skojjt»" in e["description"] and "personnummer" in e["description"]
           for e in plog["entries"]), "integrationens hämtningar syns i personens logg med namn")
 
+# Moduler: val per enhet med arv nedåt, låsning och beroenden (docs/06-moduler.md)
+dist = login("Distriktsordförande")
+st, cat, _ = call(kar, "GET", "/v1/modules")
+mods_by_id = {m["id"]: m for m in cat or []}
+check(st == 200 and {"attendance", "grants", "statistics", "integrations"}
+      <= {i for i, m in mods_by_id.items() if m["availability"] == "available"}
+      and mods_by_id["grants"]["depends_on"] == ["attendance"] and mods_by_id["billing"]["availability"] == "planned",
+      f"modulkatalog: {len(cat)} moduler, Bidrag kräver Närvaro, Fakturering är planerad")
+st, kb, _ = call(kar, "GET", f"/v1/bodies/{key}")
+check(st == 200 and [n["segment"] for n in kb["nav"]] == ["narvaro", "bidrag", "statistik", "integrationer"],
+      "kårens menyval kommer från modulerna")
+_, lb, _ = call(leader, "GET", f"/v1/bodies/{tkey}")
+check([n["segment"] for n in lb["nav"]] == ["narvaro", "bidrag", "statistik"],
+      "avdelningsledaren ser bara modulerna hen har behörighet till")
+check(call(reg, "PUT", f"/v1/bodies/{key}/modules/grants", {"enabled": False}, csrf)[0] == 403,
+      "registrerare får inte välja moduler (403)")
+st, conflict, _ = call(kar, "PUT", f"/v1/bodies/{key}/modules/attendance", {"enabled": False}, csrf)
+check(st == 409 and "Bidrag" in (conflict or {}).get("detail", ""), "Närvaro kan inte stängas av medan Bidrag är på (409)")
+st, mods, _ = call(kar, "PUT", f"/v1/bodies/{key}/modules/grants", {"enabled": False}, csrf)
+grants_mod = next(m for m in mods if m["id"] == "grants")
+st2, off, _ = call(reg, "GET", f"/v1/bodies/{tkey}/grants")
+check(st == 200 and not grants_mod["enabled"] and grants_mod["source"] == "own" and st2 == 404
+      and off["code"] == "module_disabled", "kåren stänger av Bidrag: även avdelningen får 404 module_disabled")
+_, kb2, _ = call(kar, "GET", f"/v1/bodies/{key}")
+check("grants" not in kb2["modules"] and "bidrag" not in [n["segment"] for n in kb2["nav"]], "Bidrag försvinner ur menyn")
+check(call(anon, "GET", f"/v1/bodies/{key}/grants")[0] == 401, "en avstängd modul avslöjar inget för anonyma (401)")
+st, _, _ = call(kar, "PUT", f"/v1/bodies/{key}/modules/attendance", {"enabled": False}, csrf)
+st3, mt, _ = call(leader, "GET", f"/v1/meetings/{past[0]['id']}")
+check(st == 200 and st3 == 404 and mt["code"] == "module_disabled", "när Närvaro är av nås möten inte heller via sitt id")
+check(call(kar, "PUT", f"/v1/bodies/{key}/modules/attendance", {"enabled": None}, csrf)[0] == 200
+      and call(kar, "PUT", f"/v1/bodies/{key}/modules/grants", {"enabled": None}, csrf)[0] == 200
+      and call(reg, "GET", f"/v1/bodies/{tkey}/grants")[0] == 200, "tillbaka till ärvt val: Bidrag fungerar igen")
+dkey = "district-" + str(next(a["number"] for a in kb["ancestors"] if a["kind"] == "district"))
+st, _, _ = call(dist, "PUT", f"/v1/bodies/{dkey}/modules/statistics", {"enabled": False, "locked": True}, csrf)
+_, km, _ = call(kar, "GET", f"/v1/bodies/{key}/modules")
+stat_mod = next(m for m in km if m["id"] == "statistics")
+check(st == 200 and not stat_mod["enabled"] and stat_mod["locked_by"] and not stat_mod["can_change"]
+      and call(kar, "GET", f"/v1/bodies/{key}/statistics")[0] == 404,
+      f"distriktet stänger av och låser Statistik: kåren ser \"låst av {stat_mod['locked_by']}\"")
+check(call(kar, "PUT", f"/v1/bodies/{key}/modules/statistics", {"enabled": True}, csrf)[0] == 409,
+      "kåren kan inte ändra ett låst val (409)")
+check(call(dist, "PUT", f"/v1/bodies/{dkey}/modules/statistics", {"enabled": None}, csrf)[0] == 200
+      and call(kar, "GET", f"/v1/bodies/{key}/statistics")[0] == 200, "distriktet tar bort låset")
+check(call(kar, "PUT", f"/v1/bodies/{key}/modules/billing", {"enabled": True}, csrf)[0] == 409,
+      "en planerad modul kan inte slås på (409)")
+check(call(leader, "PUT", f"/v1/bodies/{tkey}/modules/statistics", {"enabled": False}, csrf)[0] == 403,
+      "avdelningsledare kan inte välja moduler")
+
+# Modul Statistik: bara antal, inga personuppgifter
+st, stat, _ = call(kar, "GET", f"/v1/bodies/{key}/statistics")
+ages = sum(a["female"] + a["male"] + a["other"] for a in stat["age_groups"])
+check(st == 200 and stat["totals"]["active"] == kb["counts"]["active"] == ages
+      and stat["trend"][-1]["active"] == stat["totals"]["active"] and len(stat["flows"]) == 6
+      and stat["attendance_included"] and all(0 <= (t["attendance_pct"] or 0) <= 1 for t in stat["troop_types"]),
+      f"statistik för kåren: {stat['totals']['active']} aktiva, trend {[t['active'] for t in stat['trend']]} "
+      f"({stat['took_ms']:.0f} ms)")
+st, dstat, _ = call(dist, "GET", f"/v1/bodies/{dkey}/statistics")
+check(st == 200 and dstat["totals"]["active"] > stat["totals"]["active"] and dstat["waiting"],
+      f"statistik för distriktet: {dstat['totals']['active']} aktiva ({dstat['took_ms']:.0f} ms)")
+st, tstat, _ = call(leader, "GET", f"/v1/bodies/{tkey}/statistics")
+check(st == 200 and tstat["flows"] == [] and tstat["trend"][-1]["active"] > 0,
+      "statistik för avdelningen räknas på placeringar")
+
 scout = login("Scout")
 st, sme, _ = call(scout, "GET", "/v1/me")
 check(st == 200 and not sme["contexts"], "scout utan roll har inga kontexter")
@@ -376,7 +439,9 @@ else:
     print("HOPPAR ÖVER ScoutID-kontroller (Keycloak körs inte: docker compose up -d keycloak)")
 
 st, spec, _ = call(anon, "GET", "/openapi.json")
-check(st == 200 and len(spec["paths"]) >= 8, f"OpenAPI: {len(spec['paths'])} sökvägar")
+check(st == 200 and len(spec["paths"]) >= 8
+      and {"attendance", "grants", "statistics", "integrations", "modules"} <= {t["name"] for t in spec["tags"]},
+      f"OpenAPI: {len(spec['paths'])} sökvägar, modulerna har egna taggar")
 check(call(anon, "GET", "/docs")[0] == 200, "API-dokumentation (Scalar) på /docs")
 
 print("\nALLA OK" if ok else "\nNÅGOT FALLERADE")

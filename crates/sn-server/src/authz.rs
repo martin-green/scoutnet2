@@ -28,6 +28,8 @@ pub enum Permission {
     AuditRead,
     /// Avgifter och betalstatus.
     EconomyRead,
+    /// Slå på och av moduler för enheten.
+    ModulesManage,
 }
 
 #[derive(Debug)]
@@ -39,7 +41,7 @@ pub struct RoleDef {
 
 use Permission::{
     AttendanceRead, AttendanceWrite, AuditRead, BodyRead, EconomyRead, MembersContactRead, MembersManage, MembersRead,
-    NationalIdRead, PersonalRead, ReportsRead,
+    ModulesManage, NationalIdRead, PersonalRead, ReportsRead,
 };
 
 const ROLE_DEFS: &[RoleDef] = &[
@@ -57,12 +59,13 @@ const ROLE_DEFS: &[RoleDef] = &[
             ReportsRead,
             AuditRead,
             EconomyRead,
+            ModulesManage,
         ],
     },
     RoleDef {
         key: "distriktsordforande",
         label: "Distriktsordförande",
-        permissions: &[BodyRead, MembersRead, ReportsRead],
+        permissions: &[BodyRead, MembersRead, ReportsRead, ModulesManage],
     },
     RoleDef {
         key: "karordforande",
@@ -77,6 +80,7 @@ const ROLE_DEFS: &[RoleDef] = &[
             ReportsRead,
             AuditRead,
             EconomyRead,
+            ModulesManage,
         ],
     },
     RoleDef {
