@@ -1,17 +1,22 @@
 # Moduler i Scoutnet 2
 
-> Förslag till arkitektur, med en fungerande grund i prototypen (oktober 2026).
+> Version 0.2, 2026-10-18. Förslag till arkitektur, med en fungerande grund i prototypen.
 > Hör ihop med [planen](./02-plan.md) (avsnitt 4 och bilaga A) och [prototypen](./03-prototyp.md).
+> Planer för enskilda moduler: [Fakturering](./moduler/fakturering.md), [Statsbidrag](./moduler/statsbidrag.md) och [E-postlistor](./moduler/epostlistor.md).
 
 ## Sammanfattning
 
-Scoutnet 2 byggs som en **kärna** och **moduler** ovanpå den. Fakturering, Bidrag (stadsbidrag), Närvaro, Statistik, E-postlistor och Aktiviteter är exempel på moduler. Kåren, distriktet eller förbundet väljer vilka moduler de använder.
+Moduler är först och främst **ett sätt att dela upp arbetet**:
+- Utvecklare kan bidra till olika delar av Scoutnet 2 utan att störa varandra.
+- Den som har en idé kan komma med en ny modul som pluggas in, **utan att kärnan behöver göras om** (avsnitt 1.1).
+
+Scoutnet 2 byggs därför som en **kärna** och **moduler** ovanpå den. Fakturering, Bidrag, Statsbidrag, Närvaro, Statistik, E-postlistor och Aktiviteter är exempel på moduler. För kårerna betyder det att kåren, distriktet eller förbundet väljer vilka moduler de använder.
 
 Modulerna finns på tre nivåer, och nivån väljs efter hur nära persondatan de behöver komma:
 
 | Nivå | Vad | Vem bygger | Körs | Exempel |
 |---|---|---|---|---|
-| 1. Inbyggda moduler | Funktioner med full tillgång till kärnan, granskade och levererade med Scoutnet 2 | Scouternas utvecklare och bidragsgivare i det öppna repot | I samma program (modulär monolit) | Närvaro, Bidrag, Statistik, Fakturering, E-postlistor, Aktiviteter |
+| 1. Inbyggda moduler | Funktioner med full tillgång till kärnan, granskade och levererade med Scoutnet 2 | Scouternas utvecklare och bidragsgivare i det öppna repot | I samma program (modulär monolit) | Närvaro, Bidrag, Statsbidrag, Statistik, Fakturering, E-postlistor, Aktiviteter |
 | 2. Regler och inställningar som data | Lokala variationer utan ny kod | Förbundet, distrikt eller kårer, via gränssnittet | Tolkas av en inbyggd modul | Kommunens bidragsregler, avgiftsmodeller, mallar |
 | 3. Externa appar | Egna system som använder API:t | Kårer, distrikt och andra organisationer | Hos dem själva | Skojjt under övergången, kårens webbplats, synk till Google Workspace, Discord |
 
@@ -26,13 +31,63 @@ Grunden finns redan i prototypen (avsnitt 12). Närvaro, Bidrag, Integrationer o
 
 ## 1. Varför moduler
 
+### 1.1 För utvecklare: bidra utan att störa andra
+
+Scoutnet 2 är ett öppet projekt (MIT, under Scouterna på GitHub). Det byggs av en liten kärngrupp och av frivilliga som kan en del av verksamheten väl, till exempel en kassör som vill förbättra faktureringen eller en ledare som vill ha bättre e-postlistor. Modulerna ska göra det möjligt för dem att arbeta parallellt.
+
+**Principen: kärnan ändras inte för en modul.**
+- En ny modul läggs till genom att **lägga till kod**, inte genom att ändra befintlig kod.
+- Behöver en modul något som kärnan saknar, blir det en **generell utbyggnadspunkt** som alla moduler kan använda. Den beslutas som en ADR och byggs en gång.
+
+De tre modulplanerna visar mönstret. De behöver samma få utbyggnadspunkter (avsnitt 13), inte tre olika ändringar i kärnan.
+
+**Det en modul äger:**
+
+| Del | Var (målbild) | I prototypen |
+|---|---|---|
+| Serverkod | En egen crate, `modules/<id>/server` (`sn-mod-<id>`) | `crates/sn-server/src/modules/<id>/` |
+| Webbsidor och komponenter | `modules/<id>/web`. Hittas automatiskt av webbappen (Vite `import.meta.glob`). | `web/src/routes/[kind=kind]/[nr=nr]/<sökväg>/` |
+| Databas | Eget schema och egna migreringar med egen migreringstabell | Kärnans migreringar |
+| Tester | Egna tester och kontraktstester mot kärnan | Rökprovet |
+| Dokumentation | `docs/moduler/<id>.md` (plan och beslut) | Tre planer finns |
+| Ägare | En rad i `CODEOWNERS`. Modulens team granskar sin kod. | – |
+
+**Kontraktet är stabilt:**
+- Modulerna bygger mot **kärnans SDK** (`sn-core`): inloggad användare och behörighet, revisionslogg, filterspråket, händelser, jobb, inställningar, arkiv och underskrift.
+- SDK:n följer semantisk versionering. En brytande ändring kräver en ny huvudversion och en övergångstid, och kontraktstester visar att alla moduler fortfarande fungerar.
+- Modulerna använder **inte** kärnans interna typer. Det är vad som gör att kärnan kan utvecklas utan att modulerna går sönder, och tvärtom.
+
+**Plugga in:**
+- **Server:** modulens crate läggs till som beroende i serverns sammansättning, eller väljs med en Cargo-feature. Registreringen sker med en rad, eller automatiskt med `inventory`. Katalog, menyval, spärr, aktivering och API-dokumentation följer med.
+- **Webb:** modulens sidor hittas automatiskt. Menyval och brödsmulor kommer från manifestet.
+- **Databas:** kärnan kör modulens migreringar vid start, i modulens schema.
+
+**Utveckla en modul för sig:**
+- Kör kärnan med syntetisk testdata (`seed`) och modulen påslagen.
+- CI kör modulens egna tester och kontraktstesterna.
+- En ändring i en modul kan bara påverka moduler som uttryckligen beror på den (beroendegrafen mellan crates kontrolleras).
+
+**Granskning:**
+- Modulens team granskar modulens kod.
+- Kärngruppen granskar ändringar i SDK:n och **vad modulen begär**: behörigheter, dataklasser (planen 5.2), händelser och externa anrop.
+- En checklista för personuppgifter gäller för alla moduler som läser kontakt- eller personuppgifter.
+
+**Läget i prototypen:**
+- Modulen Statistik lades till med en ny katalog i servern, en rad i `MODULES` och en sidkatalog i webben.
+- Brödsmulorna kommer nu från modulkatalogen, så ingen av webbappens kärnfiler behövde ändras.
+- **Kvar att lösa i SDK:n:**
+  - Behörigheterna är en sluten lista i kärnan. Statistik använder därför `reports_read`. Moduler ska kunna deklarera egna behörigheter.
+  - Tabellerna ligger i kärnans migreringar.
+  - Webbsidorna ligger i kärnans route-träd.
+
+### 1.2 För kårer, distrikt och förbundet
+
 - **Kårerna är olika.** En liten kår vill ha medlemsregister och närvaro. En stor kår vill också ha fakturering, e-postlistor och läger med anmälan. Det som inte används ska inte synas.
 - **Förbundet och distrikten behöver kunna styra.** Till exempel: "Fakturering används av alla kårer från 2028" eller "Bidrag är på i alla kårer i Göteborg".
 - **Gradvis införande och piloter.** En ny modul slås på i fem pilotkårer och sedan för alla, utan en separat mekanism för funktionsflaggor. Det gör också flytten från Scoutnet och Skojjt stegvis, modul för modul.
-- **Fler kan bidra.** I ett öppet projekt (MIT, under Scouterna på GitHub) kan en grupp bygga E-postlistor medan en annan bygger Aktiviteter, utan att röra kärnan.
 - **Säkerheten blir lättare att granska.** Persondata och behörighet finns på ett ställe. En modul som bara räknar statistik kan granskas för det den gör.
 
-Det här är **inte** målet: en öppen marknad för insticksprogram där vem som helst kan köra kod nära medlemmarnas personuppgifter. Den sortens utbyggnad sker som externa appar (nivå 3), med samma skydd som andra integrationer.
+Det här är **inte** målet: en öppen marknad för insticksprogram där vem som helst kan köra kod nära medlemmarnas personuppgifter. Moduler i Scoutnet 2 granskas och levereras med systemet. Fri utbyggnad utan granskning sker som externa appar (nivå 3), med samma skydd som andra integrationer.
 
 ## 2. Tre nivåer i detalj
 
@@ -263,14 +318,20 @@ sequenceDiagram
 | Modul | Innehåll | Kräver | Händelser in → ut | Status |
 |---|---|---|---|---|
 | ✅ **Närvaro** (`attendance`) | Terminsplanering, närvaro i mobilen, kalender (iCal) | – | `placement.changed` → `meeting.held` | Modul i prototypen |
-| 📄 **Bidrag** (`grants`) | Kommunala aktivitetsbidrag (stadsbidrag): regler som data, kontroll per sammankomst, DAK-export. Senare även lägerbidrag och statsbidrag. | Närvaro | `meeting.held` → – | Modul i prototypen |
+| 📄 **Bidrag** (`grants`) | Kommunala aktivitetsbidrag: kommunens regler som data, kontroll per sammankomst, DAK-export. Senare även lägerbidrag. | Närvaro | `meeting.held` → – | Modul i prototypen |
+| 🏛️ **Statsbidrag** (`state_grant`) | Statsbidrag från MUCF via Scouterna: medlemsföreningar på kår-, avdelnings- eller patrullnivå, ögonblicksbild 31/12, årsmöten i mobilen, förifylld ansökan, godkännande med ScoutID, revision och utbetalning | – (använder Närvaro, Fakturering och E-postlistor om de är på) | `placement.changed`, `membership.confirmed`, `meeting.held` → `state_grant.*` | Planerad, [plan](./moduler/statsbidrag.md) |
 | 📊 **Statistik** (`statistics`) | Medlemsutveckling, ålder och kön, scouter per ledare, närvaro per gren, väntelista | – (använder Närvaro om den är på) | – | **Ny modul** i prototypen |
 | 🔌 **Integrationer** (`integrations`) | API-nycklar per kår, Scoutnet-kompatibelt API | – | – → webhooks | Modul i prototypen |
-| 💳 **Fakturering** (`billing`) | Terminsavgifter och fakturor, påminnelser, Bankgiro/Swish, export till bokföring. Tar över avgiftsfälten från kärnan. | – | `member.joined`, `member.left` → `invoice.paid` | Planerad (planen fas 4) |
-| ✉️ **E-postlistor** (`mailing_lists`) | Listor som uppdateras automatiskt efter avdelning, roll och ålder. Synk till Google Workspace eller en e-posttjänst. | – | `member.*`, `placement.changed`, `role.*`, `person.contact_changed` → – | Planerad (planen fas 3) |
+| 💳 **Fakturering** (`billing`) | Kansliets terminsfakturering i omgångar med brytdatum, påminnelser, returpost som skannas in, betalningar från Bankgiro och Swish till rätt person, avräkning till kår och distrikt, SIE4. Tar över avgiftsfälten från kärnan. | – | `member.joined`, `member.left`, `person.address_changed` → `invoice.*`, `membership.confirmed` | Planerad, [plan](./moduler/fakturering.md) |
+| ✉️ **E-postlistor** (`mailing_lists`) | Standardlistor per avdelning, listor från medlemslistans filter med vårdnadshavare som målgrupp, utskick med arkiv för föräldrar, studsar, synk till Google Workspace och M365 | – (använder Närvaro om den är på) | `member.*`, `placement.changed`, `role.*`, `person.contact_changed`, `guardian.changed` → `list.*`, `email.bounced` | Planerad, [plan](./moduler/epostlistor.md) |
 | 🏕️ **Aktiviteter** (`activities`) | Arrangemang och läger: anmälan, formulär, deltagarlistor, specialkost, incheckning | – (använder Fakturering och Närvaro om de är på) | `invoice.paid` → `registration.*` | Planerad (planen fas 5) |
 
 "Använder X om den är på" är ett **valfritt beroende**. Modulen fungerar utan X men får mer funktion med den. Statistik visar till exempel närvaro per gren bara när Närvaro är på. Det är redan implementerat.
+
+Planerna visar också hur modulerna hänger ihop utan att bero hårt på varandra:
+- **Betalningar till statsbidraget.** Fakturering skriver *bekräftat medlemskap* i kärnan när en faktura är betald. Statsbidrag läser det för att avgöra vilka medlemmar som räknas.
+- **Årsmötet blir ett möte.** Statsbidrag använder Närvaro för årsmötets närvaro och verksamhetsredovisning.
+- **Felaktiga kontaktuppgifter.** Returpost (Fakturering) och studsande e-post (E-postlistor) markerar kontaktuppgifter som felaktiga på samma sätt i kärnan. Kåren ser båda på samma ställe.
 
 ## 12. Så ser det ut i prototypen
 
@@ -294,25 +355,37 @@ Modulen Statistik byggdes så här. Rust-delen är cirka 400 rader, och modulen 
 
 1. Skapa `crates/sn-server/src/modules/<id>/mod.rs` med manifest (id, namn, beskrivning, beroenden, menyval) och `impl Module`.
 2. Skriv anropen i samma katalog, med `#[utoipa::path]` och en `router()`. Använd `load_visible_body` och behörigheterna för att avgöra vem som får se vad.
-3. Lägg till modulen i `MODULES` i [modules/mod.rs](../crates/sn-server/src/modules/mod.rs), efter de moduler den beror på (ett enhetstest kontrollerar ordningen).
+3. Lägg till modulen i `MODULES` i [modules/mod.rs](../crates/sn-server/src/modules/mod.rs), efter de moduler den beror på (ett enhetstest kontrollerar ordningen). Det är den enda raden i befintlig kod som ändras.
 4. Lägg sidan i `web/src/routes/[kind=kind]/[nr=nr]/<sökväg>/+page.svelte`, och kör `npm run api:types` för typerna.
 5. Lägg till kontroller i `scripts/smoke.py`.
 
-Menyval, spärr, aktivering per enhet, beroenden och API-dokumentation följer med automatiskt.
+Menyval, brödsmulor, spärr, aktivering per enhet, beroenden och API-dokumentation följer med automatiskt.
 
 ## 13. Vägen framåt
 
 1. **Klart i prototypen:**
    - kontrakt och katalog
    - aktivering per enhet med arv, låsning och beroenden
-   - spärr och meny från servern
+   - spärr, meny och brödsmulor från modulerna
    - fyra moduler, varav Statistik är ny
-2. **Fas 1 (fundament):**
-   - Bryt ut kärnans gränssnitt till en crate (`sn-core`: `AppState`, behörighet, revisionslogg, listmotor, händelser) och varje modul till en egen crate (`sn-mod-attendance` …).
-   - Ge modulerna egna scheman och migreringar, outbox och jobb.
-   - Låt modulerna deklarera behörigheter och lägga till kolumner i listan.
-   - Testa modulgränserna i CI.
-3. **Fas 2–5:** bygg modulerna i planens ordning: Närvaro och Bidrag, E-postlistor, Fakturering, Aktiviteter. Varje modul piloteras i några kårer genom att slås på bara där.
+2. **Fas 1 (fundament): kärnans SDK.** Utbyggnadspunkterna nedan gör att planerade moduler kan byggas utan att kärnan görs om. Varje punkt byggs en gång och används av flera moduler.
+
+   | Utbyggnadspunkt i kärnan | Behövs av |
+   |---|---|
+   | SDK-crate (`sn-core`) och en crate per modul, med registrering utan kärnändring | Alla |
+   | Behörigheter som moduler deklarerar, med standardroller och tidsbegränsade tilldelningar | Fakturering, Statsbidrag, E-postlistor |
+   | Eget schema och egna migreringar per modul | Alla |
+   | Outbox (händelser), jobb och inkommande webhooks med signaturkontroll | Fakturering (BgMax, Swish), E-postlistor (studsar, inkommande), Statsbidrag (ögonblicksbild) |
+   | Kontaktuppgifters status: felaktig adress och studsande e-post | Fakturering (returpost), E-postlistor (studsar) |
+   | Bekräftat medlemskap per termin (`membership_term`) | Fakturering (skriver), Statsbidrag och Statistik (läser) |
+   | Filterspråket som tjänst ("vilka matchar den här vyn?") | E-postlistor, Fakturering (urval), Statsbidrag |
+   | Kolumner, filter, flikar och kort från moduler | Alla |
+   | Arkiv per enhet och underskrift med ScoutID (step-up, hash av dokumentet) | Statsbidrag (protokoll), Fakturering (PDF) |
+   | Webbsidor som hittas automatiskt i `modules/<id>/web` | Alla |
+
+3. **Fas 2–5:** bygg modulerna i planens ordning: Närvaro och Bidrag, E-postlistor, Fakturering och Statsbidrag, Aktiviteter. Varje modul piloteras i några kårer genom att slås på bara där.
+   - Varje plan har en **etapp 0**: en demo i prototypen på ungefär en vecka, som kan byggas i dag ovanpå prototypens kärna.
+   - Etapperna därefter kräver utbyggnadspunkterna ovan.
 4. **Externa appar:** appregister och webhooks när OAuth-scopes finns i ScoutID (planen 6.2–6.3).
 
 ## 14. Risker och hur de hanteras
@@ -325,3 +398,5 @@ Menyval, spärr, aktivering per enhet, beroenden och API-dokumentation följer m
 | Prestanda för kontrollen per anrop | Två små frågor per anrop (under 1 ms). Kan cachas i minnet och uppdateras med `LISTEN/NOTIFY`. |
 | Data i avstängda moduler | Data finns kvar, och omfattas av modulens gallringsregler och GDPR-krokar |
 | Modul som ändrar beteende i kärnan | Modulen kan bara lägga till, via utbyggnadspunkterna. Kärnans regler (behörighet, maskning, revisionslogg) går inte att stänga av. |
+| Kärnan blir en flaskhals för nya utbyggnadspunkter | Kärngruppen äger SDK:n och prioriterar de punkter som flera moduler behöver (tabellen i avsnitt 13). Förslag på nya punkter går som ADR med ett konkret modulbehov. |
+| SDK:n ändras så att moduler går sönder | Semantisk versionering, övergångstid för brytande ändringar och kontraktstester för alla moduler i CI |

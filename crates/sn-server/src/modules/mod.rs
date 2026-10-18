@@ -95,9 +95,22 @@ static PLANNED: &[Manifest] = &[
     Manifest {
         id: "billing",
         name: "Fakturering",
-        description: "Terminsavgifter och fakturor till medlemmar och vårdnadshavare, med påminnelser, \
-                      avstämning mot Bankgiro och Swish och export till bokföringen. Tar över avgiftsfälten från kärnan.",
+        description: "Terminsavgifter som kansliet fakturerar centralt i omgångar med brytdatum, påminnelser, \
+                      betalningar från Bankgiro och Swish till rätt person, returpost som skannas in och \
+                      markerar adressen som felaktig, och avräkning till kår och distrikt. Plan: docs/moduler/fakturering.md.",
         icon: "💳",
+        availability: Availability::Planned,
+        default_enabled: false,
+        depends_on: &[],
+        nav: &[],
+    },
+    Manifest {
+        id: "state_grant",
+        name: "Statsbidrag",
+        description: "Kårens årliga ansökan om statsbidrag (MUCF) på kår-, avdelnings- eller patrullnivå: \
+                      ögonblicksbild 31 december, årsmöten som hålls och protokollförs digitalt, kontroll av \
+                      reglerna i realtid och godkännande med ScoutID. Plan: docs/moduler/statsbidrag.md.",
+        icon: "🏛️",
         availability: Availability::Planned,
         default_enabled: false,
         depends_on: &[],
@@ -106,8 +119,10 @@ static PLANNED: &[Manifest] = &[
     Manifest {
         id: "mailing_lists",
         name: "E-postlistor",
-        description: "Listor som uppdateras av sig själva utifrån avdelning, roll och ålder, t.ex. \"alla \
-                      vårdnadshavare i Spårhundarna\". Synkas till Google Workspace eller en e-posttjänst.",
+        description: "Listor som skapas av sig själva för varje avdelning och uppdateras efter avdelning, roll och \
+                      ålder, med vårdnadshavare som egen målgrupp. Skicka från Scoutnet 2 eller listans adress, \
+                      utskicksarkiv för föräldrar, studsar som syns i medlemslistan och synk till Google Workspace. \
+                      Plan: docs/moduler/epostlistor.md.",
         icon: "✉️",
         availability: Availability::Planned,
         default_enabled: false,

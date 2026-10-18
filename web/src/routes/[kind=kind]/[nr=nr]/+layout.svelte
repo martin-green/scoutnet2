@@ -5,16 +5,18 @@
 
 	let { data, children }: LayoutProps = $props();
 
-	const subpages: Record<string, string> = {
+	// Kärnans undersidor. Modulernas undersidor får sina etiketter från modulkatalogen, så att en ny
+	// modul inte behöver ändra den här filen.
+	const coreSubpages: Record<string, string> = {
 		medlemmar: 'Medlemmar',
 		vantelista: 'Väntelista',
 		organisation: 'Organisation',
-		narvaro: 'Närvaro',
-		bidrag: 'Bidrag',
-		integrationer: 'Integrationer',
-		statistik: 'Statistik',
 		moduler: 'Moduler'
 	};
+	const subpages = $derived<Record<string, string>>({
+		...Object.fromEntries(data.catalog.flatMap((m) => m.nav.map((n) => [n.segment, n.label]))),
+		...coreSubpages
+	});
 	// Undersidor efter /[kind]/[nr]. Dynamiska delar (t.ex. ett möte) får sin etikett från sidans data (`crumb`).
 	const crumbs = $derived.by(() => {
 		const segments = (page.route.id ?? '').split('/').slice(3);

@@ -2,7 +2,11 @@
 
 > Ett modernt, API-först medlemssystem för Scouterna, skrivet i Rust.
 > Bygger på analysen i [01-analys-av-scoutnet.md](./01-analys-av-scoutnet.md).
-> Version 0.6, 2026-10-18. Ett levande dokument där beslut dokumenteras som ADR:er i `docs/adr/`.
+> Version 0.7, 2026-10-18. Ett levande dokument där beslut dokumenteras som ADR:er i `docs/adr/`.
+>
+> **Ändringar i 0.7:**
+> - Moduler är först ett sätt för utvecklare att bidra utan att störa varandra: en ny modul läggs till utan att kärnan görs om ([06-moduler.md](./06-moduler.md), avsnitt 1.1). De utbyggnadspunkter i kärnan som modulerna behöver är samlade i en tabell (avsnitt 13).
+> - Planer för modulerna [Fakturering](./moduler/fakturering.md), [Statsbidrag](./moduler/statsbidrag.md) och [E-postlistor](./moduler/epostlistor.md).
 >
 > **Ändringar i 0.6:**
 > - Scoutnet 2 byggs av en kärna och **moduler** (Närvaro, Bidrag, Statistik, Fakturering, E-postlistor, Aktiviteter …) som slås på per förbund, distrikt eller kår. Se [06-moduler.md](./06-moduler.md), 4.1 och ADR-016.
@@ -125,9 +129,9 @@ Uppskattad tid är **24–30 månader** till full ersättning med ett kärnteam 
 | Självregistrering | Iframe, egen CSS, GA-ID | Hostad, tillgänglig och flerspråkig. Tema via designtokens (ingen fri CSS). Ingen tredjepartsspårning. | 3 |
 | Ledarsjälvservice | Endast medlemsregistrerare | Avdelningsledare tar in från väntelistan och begär avslut. Godkännande kan konfigureras per kår. | 3 |
 | Registerutdrag | Registrering och påminnelser | Samma regler plus status i listor, självservice-påminnelser och spärr av roll vid utgånget utdrag (konfigurerbart) | 3 |
-| E-postlistor och utskick | Mailman-listor (används även som API-urval för Google-synk), SMS-leverantörer | Dynamiska mottagargrupper (samma filter som listorna), utskick via EU-leverantör, SMS, mallar, utskickslogg | 3 |
-| Ekonomi | Terminsfakturering, 4 metoder, OCR, återbetalning, Hogia/Visma/Itella | Versionerade avgiftsregler, BgMax/OCR, e-faktura/Kivra, Swish, SIE4, automatisk avräkning till kår och distrikt | 4 |
-| Statsbidrag | Plugin | Guide (wizard) med automatisk kontroll mot regler och ögonblicksbild per 31/12 | 4 |
+| E-postlistor och utskick | Mailman-listor (används även som API-urval för Google-synk), SMS-leverantörer | Standardlistor per avdelning, listor från medlemslistans filter med vårdnadshavare som egen målgrupp, utskick via EU-leverantör med arkiv för mottagarna, studsar, synk till Google Workspace och M365, SMS ([plan](./moduler/epostlistor.md)) | 3 |
+| Ekonomi | Terminsfakturering, 4 metoder, OCR, återbetalning, Hogia/Visma/Itella | Kansliets omgångar med brytdatum och förhandsgranskning, versionerade avgiftsregler, returpost som skannas in, BgMax/OCR, e-faktura/Kivra, Swish, SIE4, automatisk avräkning till kår och distrikt ([plan](./moduler/fakturering.md)) | 4 |
+| Statsbidrag | Plugin | Kontroll av regler under hösten, låst ögonblicksbild per 31/12, årsmöten i mobilen med protokoll, förifylld ansökan med godkännande via ScoutID, revision och utbetalning ([plan](./moduler/statsbidrag.md)) | 4 |
 | Arrangemang och kurser | Formulärbyggare, avgifter, incheckning, mallar, återkommande arrangemang (v5) | Samma kapacitet plus Swish-betalning, väntelista per arrangemang, QR-incheckning och kursflöde för Folkhögskolan | 5 |
 | Märken, utmärkelser och CV | Admin-katalog, v5-märkestagning, loggbok | Gemensam märkeskatalog med delmoment (scout eller ledare), översikt per avdelning, CV från kurser | 5 |
 | Arkiv, enkäter, resurser | Grundläggande | Fas 5+ efter behovsanalys. Arkiv kan ersättas av Scouternas M365 eller Google. | 5+ |
@@ -986,7 +990,7 @@ gantt
 | 013 | Lösenord och kontoprovisionering | Lösenorden flyttas till ScoutID via lat migrering. Konton förprovisioneras från Scoutnet 2 via Keycloak Admin API (händelsedrivet), med en skrivskyddad User Storage SPI som alternativ. Organisationsträdet speglas inte som Keycloak-grupper. |
 | 014 | Behörighetskälla | Scoutnet 2:s egen databas är källa för behörighet, inte token-claims. ScoutID:s `memberships`-claim matas från Scoutnet 2:s IdP-API, med storleksgräns, för andra relying parties. |
 | 015 | Identifierare i adresser | **Beslutat i prototypen:** UUID (v7) är primärnyckel och används i alla relationer och integrationer. Enheter har dessutom ett nummer som är unikt per typ, och som för migrerade enheter är Scoutnets id (samma som Skojjt). Webbens adresser använder numret (`/kar/1001`) och API:t godtar nyckeln `group-1001`. Personer adresseras bara med UUID. |
-| 016 | Moduler | **Beslutat i prototypen:** inbyggda moduler med ett gemensamt kontrakt (manifest och Rust-trait) i en modulär monolit, aktiverade per enhet med arv nedåt, låsning och beroenden. Regler som data för lokal variation (Wasm bara vid behov). Externa appar via API, OAuth-scopes och webhooks. Inga insticksprogram som laddas vid körning. Se [06-moduler.md](./06-moduler.md). |
+| 016 | Moduler | **Beslutat i prototypen:** inbyggda moduler med ett gemensamt kontrakt (manifest och Rust-trait) i en modulär monolit, aktiverade per enhet med arv nedåt, låsning och beroenden. Regler som data för lokal variation (Wasm bara vid behov). Externa appar via API, OAuth-scopes och webhooks. Inga insticksprogram som laddas vid körning. **Kärnan ändras inte för en enskild modul.** Det som saknas blir generella utbyggnadspunkter i kärnans SDK. Se [06-moduler.md](./06-moduler.md). |
 
 ## 19. Nästa 30 dagar
 
