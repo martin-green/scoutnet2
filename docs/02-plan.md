@@ -7,7 +7,7 @@
 > **Ändringar i 0.7:**
 > - Moduler är först ett sätt för utvecklare att bidra utan att störa varandra: en ny modul läggs till utan att kärnan görs om ([06-moduler.md](./06-moduler.md), avsnitt 1.1). De utbyggnadspunkter i kärnan som modulerna behöver är samlade i en tabell (avsnitt 13).
 > - Planer för modulerna [Fakturering](./moduler/fakturering.md), [Statsbidrag](./moduler/statsbidrag.md) och [E-postlistor](./moduler/epostlistor.md).
-> - Fakturering tar emot betalningar från **Fritidskortet** (statens stöd, utbetalt av E-hälsomyndigheten). De kan täcka hela eller delar av medlemsavgiften ([fakturering.md](./moduler/fakturering.md), avsnitt 11).
+> - Fakturering tar emot betalningar från **Fritidskortet** (statens stöd, utbetalt av E-hälsomyndigheten). De kan täcka hela eller delar av medlemsavgiften ([fakturering.md](./moduler/fakturering.md), avsnitt 11). Kåren anger Scouternas centrala bankgiro, så hanterar kansliet betalningarna centralt och kåren slipper administrationen.
 >
 > **Ändringar i 0.6:**
 > - Scoutnet 2 byggs av en kärna och **moduler** (Närvaro, Bidrag, Statistik, Fakturering, E-postlistor, Aktiviteter …) som slås på per förbund, distrikt eller kår. Se [06-moduler.md](./06-moduler.md), 4.1 och ADR-016.

@@ -1,7 +1,9 @@
 # Plan: modulen Fakturering
 
-> Version 0.2, 2026-10-19. Del av [modulplanen](../06-moduler.md). Modulens id är `billing`.
+> Version 0.3, 2026-10-19. Del av [modulplanen](../06-moduler.md). Modulens id är `billing`.
 > Bygger på [analysen](../01-analys-av-scoutnet.md) (avsnitt 8.2 Ekonomi), [huvudplanen](../02-plan.md) (fas 4), Scouternas supportsidor om medlemsavgifter 2026 och Fritidskortet, samt information från fritidskortet.se och E-hälsomyndigheten.
+>
+> **Ändringar i 0.3:** Kåren anger **Scouternas centrala bankgiro** i Fritidskortets register. Då hanterar kansliet betalningarna centralt, och kåren slipper registrera dem för hand. Kårens eget bankgiro stöds bara som undantag, för kårer som redan angett det, tills de har bytt (avsnitt 11).
 >
 > **Ändringar i 0.2:** Fritidskortet (avsnitt 11): betalningar från staten via E-hälsomyndigheten som täcker hela eller delar av avgiften, kårens anslutning, delbetalning, återbetalning till Fritidskortet och dataskydd.
 
@@ -23,7 +25,7 @@ Modulen gör det arbetet säkrare och mindre manuellt:
   - Vårdnadshavaren betalar via en knapp vid fakturan.
   - Delbetalningen och resten matchas på samma OCR, och påminnelser gäller bara det som är kvar.
   - Återbetalningar går tillbaka till Fritidskortet, inte till vårdnadshavaren.
-  - Kåren ser om den är ansluten till Fritidskortet.
+  - Kåren ansluter sig med **Scouternas centrala bankgiro**. Då hanterar kansliet betalningarna centralt, och kåren har ingen egen administration av dem.
 - **Kåren ser läget.** Kåren ser obetalda, returnerade adresser och sista dag för att avregistrera obetalda, och utbetalningarna till kåren.
 - **Medlemmen ser sina fakturor** och betalar med Fritidskortet, Swish eller QR-kod i bankappen.
 
@@ -56,6 +58,7 @@ Andra förutsättningar:
   - Vårdnadshavare kan betala hela eller delar av medlemsavgiften med Fritidskortet, om kåren är ansluten till Fritidskortets register.
   - Scoutnet är ett anslutet föreningssystem: vid fakturan finns en knapp som öppnar Fritidskortets betalformulär med uppgifterna förifyllda.
   - Det som inte täcks betalas till Scouternas bankgiro med fakturans OCR.
+  - Kåren kan ange Scouternas centrala bankgiro i Fritidskortets register. Då hanterar kansliet betalningen centralt, och kåren slipper hantera den för hand.
 
 Problem som modulen ska lösa:
 
@@ -89,7 +92,7 @@ Behörigheterna deklareras av modulen (se [06-moduler.md](../06-moduler.md), avs
 | `billing.runs` | Skapa, förhandsgranska och godkänna omgångar | Kansliet (ekonomi), två personer per godkännande |
 | `billing.payments` | Importera betalningar, hantera avvikelser, kreditera och återbetala | Kansliet (ekonomi) |
 | `billing.returns` | Skanna in returpost | Kansliet (alla på kansliet som öppnar post) |
-| `billing.fritidskortet` | Registrera och se kårens anslutning till Fritidskortet. Registrera betalningar från Fritidskortet som kommit till kårens eget bankgiro. | Kassör, kårordförande. Kansliet för alla kårer. |
+| `billing.fritidskortet` | Registrera och se kårens anslutning till Fritidskortet. I undantagsfall: registrera betalningar från Fritidskortet som kommit till kårens eget bankgiro. | Kassör, kårordförande. Kansliet för alla kårer. |
 | (egen) | Se sina egna och sina barns fakturor och betala | Medlem, vårdnadshavare |
 
 ## 4. Årshjulet i systemet
@@ -261,7 +264,7 @@ sequenceDiagram
 
 - **Källor:**
   - BgMax-filer från Bankgirot, hämtade automatiskt varje dag eller uppladdade. E-fakturabetalningar kommer samma väg.
-  - **Fritidskortet:** utbetalningar från E-hälsomyndigheten. De kommer i BgMax när kåren angett Scouternas bankgiro, och känns igen på avsändaren. Annars registreras de av kåren (avsnitt 11).
+  - **Fritidskortet:** utbetalningar från E-hälsomyndigheten. De kommer i BgMax eftersom kåren har angett Scouternas centrala bankgiro, och känns igen på avsändaren. Har kåren undantagsvis angett sitt eget bankgiro registrerar kåren dem (avsnitt 11).
   - Swish Handel (betalningsförfrågan från fakturan eller Min profil, med svar till modulen)
   - manuell registrering (t.ex. betalt till kåren)
 - **Matchning:**
@@ -290,6 +293,7 @@ Fritidskortet är statens stöd till barns regelbundna fritidsaktiviteter.
 - **Gäller till och med 30 november.** Det som inte används kan inte sparas till nästa år.
 - **Bara regelbundna, ledarledda aktiviteter** (minst sex tillfällen inom högst sex månader). Inom Scouterna gäller det **bara medlemsavgiften**, inte läger och arrangemang.
 - **Kåren** (föreningen, med eget organisationsnummer) ska vara ansluten till Fritidskortets register med ett eller flera bankgiron. Vårdnadshavaren väljer något av dem. Pengarna kommer inom tre bankdagar.
+- **Kåren kan ange Scouternas centrala bankgiro.** Då går pengarna till Scouterna, och kansliet hanterar betalningen centralt tillsammans med fakturan. Kåren slipper hantera betalningen för hand.
 - **Hel- eller delbetalning:** vårdnadshavaren anger fakturans OCR och ett belopp mellan 1 och 2 500 kr. Det som inte täcks betalas på vanligt sätt till Scouternas bankgiro med samma OCR.
 - **Regler för vårdnadshavaren:**
   - Kortet får användas först när OCR-numret finns, och inte för en faktura som redan är betald.
@@ -302,9 +306,11 @@ Fritidskortet är statens stöd till barns regelbundna fritidsaktiviteter.
 **1. Regler som data per år.** Belopp, ålder (räknat på födelseår), sista dag och vilka avgifter kortet får användas till läggs in per kalenderår av kansliet. Belopp och regler kontrolleras mot fritidskortet.se varje år. Modulen räknar inte ut barnets saldo, eftersom det bara Fritidskortet känner till.
 
 **2. Kårens anslutning:**
-- Varje kår har uppgifterna *ansluten till Fritidskortet sedan*, *vilket bankgiro som är angivet i registret* (Scouternas centrala eller kårens eget) och *kontrollerad av kansliet*.
-- Kåren får en guide med länkar till Försäkringskassans e-tjänst och Scouternas instruktion.
+- **Standard är Scouternas centrala bankgiro.** Då behöver kåren inte göra något med betalningarna: kansliet tar emot, matchar och avräknar dem som andra betalningar.
+- Varje kår har uppgifterna *ansluten till Fritidskortet sedan*, *vilket bankgiro som är angivet i registret* (Scouternas centrala eller, som undantag, kårens eget) och *kontrollerad av kansliet*.
+- Kåren får en guide med länkar till Försäkringskassans e-tjänst och Scouternas instruktion. Guiden visar det centrala bankgirot att ange och förklarar att kåren då slipper all hantering av betalningarna.
 - Kansliet ser vilka kårer som är anslutna och vilka som har fakturor där kortet inte går att använda.
+- Kansliet ser också vilka kårer som har angett sitt eget bankgiro. De kårerna ser på sin sida en uppmaning att byta till det centrala.
 
 **3. Knappen "Betala med Fritidskortet"** i Min profil → Fakturor, och som länk i e-postfakturan. Den visas när:
 - kåren är ansluten
@@ -332,7 +338,7 @@ sequenceDiagram
   S->>F: Förifyllt: kår, bankgiro, OCR, kvar att betala 600 kr
   V->>F: Väljer 550 kr, signerar
   S-->>S: Fakturan "Fritidskortet på väg" (inga påminnelser)
-  E->>BG: 550 kr till bankgirot, med fakturans OCR (inom 3 bankdagar)
+  E->>BG: 550 kr till Scouternas bankgiro, med fakturans OCR (inom 3 bankdagar)
   BG->>S: BgMax-fil: avsändare E-hälsomyndigheten, OCR, 550 kr
   S-->>S: Delbetald: 550 kr Fritidskortet, 50 kr kvar
   S->>V: "50 kr kvar att betala" (Swish eller QR, samma OCR)
@@ -342,11 +348,12 @@ sequenceDiagram
 ```
 
 - Betalningar från E-hälsomyndigheten får källan *Fritidskortet* och samlas med vårdnadshavarens betalningar på samma faktura.
-- **Kåren har angett sitt eget bankgiro i registret:**
+- Med det centrala bankgirot sker allt ovan utan att kåren gör något. Kansliet hanterar avvikelserna centralt.
+- **Undantag: kåren har angett sitt eget bankgiro i registret.** Det stöds för kårer som redan har angett sitt eget bankgiro, tills de har bytt, så att inga betalningar tappas bort:
   - Pengarna hamnar hos kåren, medan fakturan ligger centralt.
   - Kåren registrerar betalningen på fakturan (*Betald med Fritidskortet till kåren*), en och en eller med kårens kontoutdrag.
   - Avräkningen kvittar beloppet (avsnitt 12).
-  - Modulen klarar båda fallen, men det automatiska flödet förutsätter att kåren anger Scouternas bankgiro. Vilket bankgiro kårerna ska ange beslutas med kansliet (avsnitt 21).
+  - Kåren uppmanas att byta till Scouternas centrala bankgiro.
 
 **6. Avvikelser** som gäller just Fritidskortet:
 
@@ -376,7 +383,8 @@ sequenceDiagram
 - Varje betalning fördelas på sina **avgiftskomponenter**: förbundets, distriktets och kårens del.
 - **Utbetalningar** till kårer och distrikt görs med ett intervall som kansliet bestämmer, med specifikation per termin. Kåren ser sina utbetalningar.
 - **Fritidskortet fördelas som andra betalningar** på avgiftskomponenterna. Det är medlemsavgift, bara med staten som betalare.
-  - Har pengarna gått till **kårens eget bankgiro**, har kåren redan fått hela beloppet. Förbundets och distriktets delar dras då av från kårens nästa utbetalning (kvittning). Om utbetalningen inte räcker faktureras kåren.
+  - Med det centrala bankgirot behövs inget särskilt: betalningen fördelas och betalas ut som andra.
+  - Har pengarna undantagsvis gått till **kårens eget bankgiro**, har kåren redan fått hela beloppet. Förbundets och distriktets delar dras då av från kårens nästa utbetalning (kvittning). Om utbetalningen inte räcker faktureras kåren.
   - Specifikationen visar det per faktura.
 - **Export till bokföring** som SIE4 (Visma, Hogia, Fortnox): verifikationer per dag och omgång, med konton per komponent. Betalningar från Fritidskortet får en egen märkning i verifikationen, så att de går att följa upp.
 - **Rapporter:** fakturerat och betalt per termin och kår, betalande medlemmar per termin, obetalda, returpost och andel betalt med Fritidskortet.
@@ -389,9 +397,9 @@ sequenceDiagram
 | Kansliet | **Omgångar** | Lista och detalj: förhandsgranskning, varningar, godkännanden, utskick per kanal, fel som kan skickas om |
 | Kansliet | **Returpost** | Skanningsfält eller kamera, snabbläge, dagens skanningar, ångra |
 | Kansliet | **Betalningar och avvikelser** | Importerade filer, kö med förslag, kreditering och återbetalning (även till Fritidskortet) |
-| Kansliet | **Fritidskortet** | Årets regler (belopp, ålder, sista dag), vilka kårer som är anslutna och med vilket bankgiro, återbetalningsärenden, statistik |
+| Kansliet | **Fritidskortet** | Årets regler (belopp, ålder, sista dag), vilka kårer som är anslutna och med vilket bankgiro (kårer med eget bankgiro markeras), återbetalningsärenden, statistik |
 | Kåren | **Avgifter** | Kårens komponenter per avgiftsgrupp, förhandsvisning av fakturorna, låsning vid brytdatum |
-| Kåren | **Fritidskortet** (under Avgifter) | Om kåren är ansluten och med vilket bankgiro, guide för att ansluta, registrering av betalningar som kommit till kårens eget bankgiro |
+| Kåren | **Fritidskortet** (under Avgifter) | Om kåren är ansluten och med vilket bankgiro, guide för att ansluta med Scouternas centrala bankgiro. Bara för kårer med eget bankgiro: uppmaning att byta och registrering av betalningarna. |
 | Kåren | **Fakturor** (i medlemslistan) | Kolumnerna *Avgift* och *Adress*, filtren *Obetald*, *Delbetald*, *Fritidskortet på väg*, *Returpost* och *Ej skickad*, massåtgärder för obetalda |
 | Kåren | **Översikten** | Kortet "Att göra": obetalda, felaktiga adresser och sista dag att avregistrera |
 | Medlem och vårdnadshavare | **Min profil → Fakturor** | Fakturor per termin med betalt och kvar att betala, **Betala med Fritidskortet** (när det går), betala resten med Swish eller QR, välj kanal, uppdatera adress |
@@ -416,7 +424,7 @@ Modulens egna tabeller ligger i schemat `billing`:
 | `billing.allocation` | Koppling mellan betalning och faktura. En betalning kan täcka flera fakturor, och en faktura kan ha flera betalningar. |
 | `billing.refund` | Återbetalning: mottagare (vårdnadshavare eller **Fritidskortet**), belopp, ursprunglig betalning, OCR för återbetalning, status, två godkännanden |
 | `billing.fritidskortet_year` | Regler per kalenderår: belopp, ålder (födelseår från och till), sista dag, vilka avgiftstyper som får betalas |
-| `billing.fritidskortet_body` | Kårens anslutning: ansluten sedan, bankgiro i registret (centralt eller eget), kontrollerad av och när |
+| `billing.fritidskortet_body` | Kårens anslutning: ansluten sedan, bankgiro i registret (Scouternas centrala som standard, eller kårens eget som undantag), kontrollerad av och när |
 | `billing.payout` | Utbetalning till kår och distrikt med specifikation, inklusive kvittning av Fritidskortet till kårens bankgiro |
 
 **I kärnan** (används av flera moduler):
@@ -440,7 +448,7 @@ Prototypens `term_fee` flyttas till `billing.invoice`.
 | `GET /v1/people/{id}/invoices/{inv}/fritidskortet` | Länk till Fritidskortets förifyllda formulär (kår, bankgiro, OCR, kvar att betala). Ger 409 om kortet inte kan användas, med förklaring. |
 | `POST /v1/people/{id}/invoices/{inv}/fritidskortet-pending` | Vårdnadshavaren markerar "betalt med Fritidskortet" (fem bankdagar utan påminnelse) |
 | `GET/PUT /v1/bodies/{id}/billing/fritidskortet` | Kårens anslutning och bankgiro |
-| `POST /v1/bodies/{id}/billing/fritidskortet/payments` | Kåren registrerar betalningar som kommit till kårens eget bankgiro |
+| `POST /v1/bodies/{id}/billing/fritidskortet/payments` | Kåren registrerar betalningar som kommit till kårens eget bankgiro (bara i undantagsfallet) |
 | `GET/PUT /v1/billing/fritidskortet/years/{year}` | Årets regler (kansliet) |
 | `GET /v1/billing/refunds` · `POST …/{id}/approve` | Återbetalningar, även till Fritidskortet, med två godkännanden |
 | `GET /v1/bodies/{id}/billing/payouts` | Kårens och distriktets utbetalningar |
@@ -508,6 +516,7 @@ Modulen ska kunna byggas utan att kärnan görs om. De här generella utbyggnads
   - Scoutnet 2 ansluts som föreningssystem hos E-hälsomyndigheten **innan** fakturorna flyttar, så att knappen aldrig försvinner för vårdnadshavarna.
   - OCR-serien behålls, så att betalningar från Fritidskortet på gamla fakturor matchas.
   - Kårernas anslutning, med bankgiro, importeras från Scoutnet.
+  - Kårer som har angett sitt eget bankgiro får hjälp att byta till Scouternas centrala bankgiro före övergången.
 - **Övergång:** mellan två terminer, efter sista påminnelsen och före kårens översyn av avgifterna.
 
 ## 20. Etapper
@@ -530,7 +539,7 @@ Modulen ska kunna byggas utan att kärnan görs om. De här generella utbyggnads
 | SPAR-uppdatering kräver avtal och samtycke | Fältet `spar_sync` finns. Avtal och rättslig grund utreds. |
 | Postens hantering av returer (kan returen ha en streckkod?) | Pröva med tryckpartnern: returkoden i fönstret måste klara Postens maskiner |
 | Ekonomifel | Regler som data med tester, parallellkörning till öret, två personer per omgång |
-| Vilket bankgiro ska kårerna ange i Fritidskortets register: Scouternas centrala eller kårens eget? | Bestäm med kansliet. Centralt bankgiro ger automatisk matchning. Eget bankgiro kräver att kåren registrerar betalningen och att avräkningen kvittar. Modulen stöder båda. |
+| Kårer som redan har angett sitt eget bankgiro i Fritidskortets register | Det centrala bankgirot är standard: kansliet hanterar betalningarna och kåren slipper administrationen. Kansliet tar fram listan över kårer med eget bankgiro och ber dem byta. Tills dess registrerar kåren betalningarna, och avräkningen kvittar. |
 | Hur ser integrationen med fritidskortet.se ut (förifyllda fält, kvitto tillbaka)? | Hämta specifikationen för anslutna föreningssystem från E-hälsomyndigheten och ansök om anslutning för Scoutnet 2 tidigt. Utan kvitto används vårdnadshavarens egen markering *betalt*. |
 | Belopp, ålder och sista dag ändras varje år, och källorna anger olika åldrar | Regler som data per år, uppdaterade av kansliet i december, med fritidskortet.se och E-hälsomyndigheten som källa |
 | Kan nästa års kort betala en faktura från december eller en påminnelse i januari? | Fråga Fritidskortet. Tills vidare visas knappen från det datum kansliet anger för det nya året. |
