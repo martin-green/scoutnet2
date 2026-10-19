@@ -7,6 +7,7 @@
 > **Ändringar i 0.7:**
 > - Moduler är först ett sätt för utvecklare att bidra utan att störa varandra: en ny modul läggs till utan att kärnan görs om ([06-moduler.md](./06-moduler.md), avsnitt 1.1). De utbyggnadspunkter i kärnan som modulerna behöver är samlade i en tabell (avsnitt 13).
 > - Planer för modulerna [Fakturering](./moduler/fakturering.md), [Statsbidrag](./moduler/statsbidrag.md) och [E-postlistor](./moduler/epostlistor.md).
+> - Fakturering tar emot betalningar från **Fritidskortet** (statens stöd, utbetalt av E-hälsomyndigheten). De kan täcka hela eller delar av medlemsavgiften ([fakturering.md](./moduler/fakturering.md), avsnitt 11).
 >
 > **Ändringar i 0.6:**
 > - Scoutnet 2 byggs av en kärna och **moduler** (Närvaro, Bidrag, Statistik, Fakturering, E-postlistor, Aktiviteter …) som slås på per förbund, distrikt eller kår. Se [06-moduler.md](./06-moduler.md), 4.1 och ADR-016.
@@ -130,7 +131,7 @@ Uppskattad tid är **24–30 månader** till full ersättning med ett kärnteam 
 | Ledarsjälvservice | Endast medlemsregistrerare | Avdelningsledare tar in från väntelistan och begär avslut. Godkännande kan konfigureras per kår. | 3 |
 | Registerutdrag | Registrering och påminnelser | Samma regler plus status i listor, självservice-påminnelser och spärr av roll vid utgånget utdrag (konfigurerbart) | 3 |
 | E-postlistor och utskick | Mailman-listor (används även som API-urval för Google-synk), SMS-leverantörer | Standardlistor per avdelning, listor från medlemslistans filter med vårdnadshavare som egen målgrupp, utskick via EU-leverantör med arkiv för mottagarna, studsar, synk till Google Workspace och M365, SMS ([plan](./moduler/epostlistor.md)) | 3 |
-| Ekonomi | Terminsfakturering, 4 metoder, OCR, återbetalning, Hogia/Visma/Itella | Kansliets omgångar med brytdatum och förhandsgranskning, versionerade avgiftsregler, returpost som skannas in, BgMax/OCR, e-faktura/Kivra, Swish, SIE4, automatisk avräkning till kår och distrikt ([plan](./moduler/fakturering.md)) | 4 |
+| Ekonomi | Terminsfakturering, 4 metoder, OCR, återbetalning, Hogia/Visma/Itella, knapp för Fritidskortet vid fakturan | Kansliets omgångar med brytdatum och förhandsgranskning, versionerade avgiftsregler, returpost som skannas in, BgMax/OCR, e-faktura/Kivra, Swish, Fritidskortet (del- eller helbetalning från staten, regler per år, återbetalning till Fritidskortet), SIE4, automatisk avräkning till kår och distrikt ([plan](./moduler/fakturering.md)) | 4 |
 | Statsbidrag | Plugin | Kontroll av regler under hösten, låst ögonblicksbild per 31/12, årsmöten i mobilen med protokoll, förifylld ansökan med godkännande via ScoutID, revision och utbetalning ([plan](./moduler/statsbidrag.md)) | 4 |
 | Arrangemang och kurser | Formulärbyggare, avgifter, incheckning, mallar, återkommande arrangemang (v5) | Samma kapacitet plus Swish-betalning, väntelista per arrangemang, QR-incheckning och kursflöde för Folkhögskolan | 5 |
 | Märken, utmärkelser och CV | Admin-katalog, v5-märkestagning, loggbok | Gemensam märkeskatalog med delmoment (scout eller ledare), översikt per avdelning, CV från kurser | 5 |

@@ -96,8 +96,9 @@ static PLANNED: &[Manifest] = &[
         id: "billing",
         name: "Fakturering",
         description: "Terminsavgifter som kansliet fakturerar centralt i omgångar med brytdatum, påminnelser, \
-                      betalningar från Bankgiro och Swish till rätt person, returpost som skannas in och \
-                      markerar adressen som felaktig, och avräkning till kår och distrikt. Plan: docs/moduler/fakturering.md.",
+                      betalningar från Bankgiro, Swish och Fritidskortet (hela eller delar av avgiften) till rätt \
+                      person, returpost som skannas in och markerar adressen som felaktig, och avräkning till kår \
+                      och distrikt. Plan: docs/moduler/fakturering.md.",
         icon: "💳",
         availability: Availability::Planned,
         default_enabled: false,
