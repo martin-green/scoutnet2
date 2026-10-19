@@ -121,9 +121,10 @@ static PLANNED: &[Manifest] = &[
         id: "mailing_lists",
         name: "E-postlistor",
         description: "Listor som skapas av sig själva för varje avdelning och uppdateras efter avdelning, roll och \
-                      ålder, med vårdnadshavare som egen målgrupp. Skicka från Scoutnet 2 eller listans adress, \
-                      utskicksarkiv för föräldrar, studsar som syns i medlemslistan och synk till Google Workspace. \
-                      Plan: docs/moduler/epostlistor.md.",
+                      ålder, med vårdnadshavare som egen målgrupp. Adresser som går att komma ihåg \
+                      (ledare@<kår>.lists.scouterna.se) med kontroll av avsändaren, utskick med formatering och \
+                      bilagor från Scoutnet 2 eller e-postklienten, utskicksarkiv för föräldrar, studsar som syns i \
+                      medlemslistan och synk till Google Workspace. Plan: docs/moduler/epostlistor.md.",
         icon: "✉️",
         availability: Availability::Planned,
         default_enabled: false,

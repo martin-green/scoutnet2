@@ -8,6 +8,7 @@
 > - Moduler är först ett sätt för utvecklare att bidra utan att störa varandra: en ny modul läggs till utan att kärnan görs om ([06-moduler.md](./06-moduler.md), avsnitt 1.1). De utbyggnadspunkter i kärnan som modulerna behöver är samlade i en tabell (avsnitt 13).
 > - Planer för modulerna [Fakturering](./moduler/fakturering.md), [Statsbidrag](./moduler/statsbidrag.md) och [E-postlistor](./moduler/epostlistor.md).
 > - Fakturering tar emot betalningar från **Fritidskortet** (statens stöd, utbetalt av E-hälsomyndigheten). De kan täcka hela eller delar av medlemsavgiften ([fakturering.md](./moduler/fakturering.md), avsnitt 11). Kåren anger Scouternas centrala bankgiro, så hanterar kansliet betalningarna centralt och kåren slipper administrationen.
+> - E-postlistor får adresser som går att komma ihåg, till exempel `ledare@bjorkdalen.lists.scouterna.se`, i stället för slumpade adresser. Skyddet mot skräppost är kontroll av avsändaren: DMARC, rätt att skicka och bekräftelse med ScoutID. Utskick från Scoutnet 2 får formatering och bilagor ([epostlistor.md](./moduler/epostlistor.md), avsnitt 6 och 7).
 >
 > **Ändringar i 0.6:**
 > - Scoutnet 2 byggs av en kärna och **moduler** (Närvaro, Bidrag, Statistik, Fakturering, E-postlistor, Aktiviteter …) som slås på per förbund, distrikt eller kår. Se [06-moduler.md](./06-moduler.md), 4.1 och ADR-016.
@@ -130,7 +131,7 @@ Uppskattad tid är **24–30 månader** till full ersättning med ett kärnteam 
 | Självregistrering | Iframe, egen CSS, GA-ID | Hostad, tillgänglig och flerspråkig. Tema via designtokens (ingen fri CSS). Ingen tredjepartsspårning. | 3 |
 | Ledarsjälvservice | Endast medlemsregistrerare | Avdelningsledare tar in från väntelistan och begär avslut. Godkännande kan konfigureras per kår. | 3 |
 | Registerutdrag | Registrering och påminnelser | Samma regler plus status i listor, självservice-påminnelser och spärr av roll vid utgånget utdrag (konfigurerbart) | 3 |
-| E-postlistor och utskick | Mailman-listor (används även som API-urval för Google-synk), SMS-leverantörer | Standardlistor per avdelning, listor från medlemslistans filter med vårdnadshavare som egen målgrupp, utskick via EU-leverantör med arkiv för mottagarna, studsar, synk till Google Workspace och M365, SMS ([plan](./moduler/epostlistor.md)) | 3 |
+| E-postlistor och utskick | Mailman-listor med slumpade adresser (används även som API-urval för Google-synk), utskick bara som ren text, SMS-leverantörer | Standardlistor per avdelning, listor från medlemslistans filter med vårdnadshavare som egen målgrupp, adresser som går att komma ihåg med kontroll av avsändaren, utskick med formatering och bilagor via EU-leverantör med arkiv för mottagarna, studsar, synk till Google Workspace och M365, SMS ([plan](./moduler/epostlistor.md)) | 3 |
 | Ekonomi | Terminsfakturering, 4 metoder, OCR, återbetalning, Hogia/Visma/Itella, knapp för Fritidskortet vid fakturan | Kansliets omgångar med brytdatum och förhandsgranskning, versionerade avgiftsregler, returpost som skannas in, BgMax/OCR, e-faktura/Kivra, Swish, Fritidskortet (del- eller helbetalning från staten, regler per år, återbetalning till Fritidskortet), SIE4, automatisk avräkning till kår och distrikt ([plan](./moduler/fakturering.md)) | 4 |
 | Statsbidrag | Plugin | Kontroll av regler under hösten, låst ögonblicksbild per 31/12, årsmöten i mobilen med protokoll, förifylld ansökan med godkännande via ScoutID, revision och utbetalning ([plan](./moduler/statsbidrag.md)) | 4 |
 | Arrangemang och kurser | Formulärbyggare, avgifter, incheckning, mallar, återkommande arrangemang (v5) | Samma kapacitet plus Swish-betalning, väntelista per arrangemang, QR-incheckning och kursflöde för Folkhögskolan | 5 |
@@ -749,7 +750,7 @@ Ersätta Skojjt (v1 och v2) och v5-närvaron med en inbyggd modul som har minst 
 | Swish | Swish Handel/Commerce API för arrangemang och avgifter, med återbetalningar | 4 och 5 |
 | E-faktura/Kivra | Via Kivra API och e-fakturaväxel (partner) | 4 |
 | Bokföring | SIE4-export per kår, distrikt och förbund (fungerar med Fortnox, Visma m.fl.). Hogia-export om förbundet fortsatt kräver det. | 4 |
-| E-post | EU-baserad leverantör för transaktionsmejl och utskick, med SPF, DKIM, DMARC och studshantering. Eventuellt inkommande listadresser (motsvarande Mailman) efter behovsanalys. | 3 |
+| E-post | EU-baserad leverantör för transaktionsmejl och utskick, med SPF, DKIM, DMARC och studshantering. Inkommande e-post till listadresser (`<lista>@<kår>.lists.scouterna.se`) med kontroll av avsändaren: DMARC, bekräftelse med ScoutID och moderering. | 3 |
 | SMS | EU-baserad SMS-leverantör, kostnad per kår | 3 |
 | Kommuner (aktivitetsstöd) | DAK och kommunspecifika format. På sikt direktinlämning där kommunens system har API (t.ex. via Sveriges Föreningssystem). | 2 |
 | MUCF statsbidrag | Underlagsrapport och ansökningsflöde | 4 |

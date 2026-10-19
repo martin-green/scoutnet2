@@ -12,7 +12,7 @@ Förstudie och plan för ett modernt, API-först medlemssystem för Scouterna, s
 | [docs/04-faltkatalog.md](docs/04-faltkatalog.md) | Alla personfält i Scoutnet med motsvarighet i Scoutnet 2: API-namn, tabell, dataklass, behörighet och kompatibilitetsnamn |
 | [docs/05-prestanda.md](docs/05-prestanda.md) | Prestandamätning med 100 000 syntetiska personer: metod, resultat (p50/p95 per scenario) och åtgärder |
 | [docs/06-moduler.md](docs/06-moduler.md) | Moduler: kärna och moduler (Närvaro, Bidrag, Statsbidrag, Statistik, Fakturering, E-postlistor, Aktiviteter …), hur utvecklare bidrar med en modul utan att ändra kärnan, modulkontrakt, aktivering per enhet med arv och låsning, data, händelser, behörighet och externa appar |
-| [docs/moduler/](docs/moduler/) | Planer per modul: [Fakturering](docs/moduler/fakturering.md) (omgångar med brytdatum, returpost som skannas in, betalningar), [Statsbidrag](docs/moduler/statsbidrag.md) (medlemsföreningar, årsmöten i mobilen, förifylld ansökan) och [E-postlistor](docs/moduler/epostlistor.md) (standardlistor, vårdnadshavare, arkiv, studsar, synk) |
+| [docs/moduler/](docs/moduler/) | Planer per modul: [Fakturering](docs/moduler/fakturering.md) (omgångar med brytdatum, returpost som skannas in, betalningar, Fritidskortet), [Statsbidrag](docs/moduler/statsbidrag.md) (medlemsföreningar, årsmöten i mobilen, förifylld ansökan) och [E-postlistor](docs/moduler/epostlistor.md) (standardlistor, vårdnadshavare, adresser som går att komma ihåg med kontroll av avsändaren, formatering och bilagor, arkiv, studsar, synk) |
 
 ## Status
 

@@ -323,7 +323,7 @@ sequenceDiagram
 | 📊 **Statistik** (`statistics`) | Medlemsutveckling, ålder och kön, scouter per ledare, närvaro per gren, väntelista | – (använder Närvaro om den är på) | – | **Ny modul** i prototypen |
 | 🔌 **Integrationer** (`integrations`) | API-nycklar per kår, Scoutnet-kompatibelt API | – | – → webhooks | Modul i prototypen |
 | 💳 **Fakturering** (`billing`) | Kansliets terminsfakturering i omgångar med brytdatum, påminnelser, returpost som skannas in, betalningar från Bankgiro, Swish och Fritidskortet (hela eller delar av avgiften) till rätt person, återbetalning till rätt källa, avräkning till kår och distrikt, SIE4. Tar över avgiftsfälten från kärnan. | – | `member.joined`, `member.left`, `person.address_changed` → `invoice.*`, `membership.confirmed` | Planerad, [plan](./moduler/fakturering.md) |
-| ✉️ **E-postlistor** (`mailing_lists`) | Standardlistor per avdelning, listor från medlemslistans filter med vårdnadshavare som målgrupp, utskick med arkiv för föräldrar, studsar, synk till Google Workspace och M365 | – (använder Närvaro om den är på) | `member.*`, `placement.changed`, `role.*`, `person.contact_changed`, `guardian.changed` → `list.*`, `email.bounced` | Planerad, [plan](./moduler/epostlistor.md) |
+| ✉️ **E-postlistor** (`mailing_lists`) | Standardlistor per avdelning, listor från medlemslistans filter med vårdnadshavare som målgrupp, adresser som går att komma ihåg (`ledare@<kår>.lists.scouterna.se`) med kontroll av avsändaren, utskick med formatering och bilagor, arkiv för föräldrar, studsar, synk till Google Workspace och M365 | – (använder Närvaro om den är på) | `member.*`, `placement.changed`, `role.*`, `person.contact_changed`, `guardian.changed` → `list.*`, `email.bounced` | Planerad, [plan](./moduler/epostlistor.md) |
 | 🏕️ **Aktiviteter** (`activities`) | Arrangemang och läger: anmälan, formulär, deltagarlistor, specialkost, incheckning | – (använder Fakturering och Närvaro om de är på) | `invoice.paid` → `registration.*` | Planerad (planen fas 5) |
 
 "Använder X om den är på" är ett **valfritt beroende**. Modulen fungerar utan X men får mer funktion med den. Statistik visar till exempel närvaro per gren bara när Närvaro är på. Det är redan implementerat.
@@ -376,11 +376,12 @@ Menyval, brödsmulor, spärr, aktivering per enhet, beroenden och API-dokumentat
    | Behörigheter som moduler deklarerar, med standardroller och tidsbegränsade tilldelningar | Fakturering, Statsbidrag, E-postlistor |
    | Eget schema och egna migreringar per modul | Alla |
    | Outbox (händelser), jobb och inkommande webhooks med signaturkontroll | Fakturering (BgMax, Swish), E-postlistor (studsar, inkommande), Statsbidrag (ögonblicksbild) |
-   | Kontaktuppgifters status: felaktig adress och studsande e-post | Fakturering (returpost), E-postlistor (studsar) |
+   | Kontaktuppgifters status: felaktig adress, studsande och bekräftad e-post | Fakturering (returpost), E-postlistor (studsar, kontroll av avsändaren) |
+   | Kortnamn per enhet, unikt i landet och med reserverade gamla namn | E-postlistor (listadresser) |
    | Bekräftat medlemskap per termin (`membership_term`) | Fakturering (skriver), Statsbidrag och Statistik (läser) |
    | Filterspråket som tjänst ("vilka matchar den här vyn?") | E-postlistor, Fakturering (urval), Statsbidrag |
    | Kolumner, filter, flikar och kort från moduler | Alla |
-   | Arkiv per enhet och underskrift med ScoutID (step-up, hash av dokumentet) | Statsbidrag (protokoll), Fakturering (PDF) |
+   | Arkiv per enhet och underskrift med ScoutID (step-up, hash av dokumentet) | Statsbidrag (protokoll), Fakturering (PDF), E-postlistor (bilagor) |
    | Webbsidor som hittas automatiskt i `modules/<id>/web` | Alla |
 
 3. **Fas 2–5:** bygg modulerna i planens ordning: Närvaro och Bidrag, E-postlistor, Fakturering och Statsbidrag, Aktiviteter. Varje modul piloteras i några kårer genom att slås på bara där.
