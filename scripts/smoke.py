@@ -5,6 +5,7 @@ Kör: python scripts/smoke.py   (servern ska vara igång på http://127.0.0.1:80
 import base64
 import http.cookiejar
 import json
+import socket
 import sys
 import urllib.error
 import urllib.request
@@ -52,6 +53,27 @@ anon = client()
 check(call(anon, "GET", "/v1/me")[0] == 401, "anonym får 401 på /v1/me")
 check(call(anon, "POST", "/auth/dev/login", {"account_id": "00000000-0000-0000-0000-000000000000"})[0] == 403,
       "POST utan CSRF-header nekas")
+
+
+def raw_status(request: bytes) -> int:
+    """Skickar bara headers och läser statusraden, utan att skicka någon kropp."""
+    host, port = BASE.removeprefix("http://").split(":")
+    with socket.create_connection((host, int(port)), timeout=5) as s:
+        s.sendall(request)
+        return int(s.recv(64).split(b" ")[1])
+
+
+# Gränser (lärdom från PHP2Shell, docs/02-plan.md 7.7): inget tolkas före kontrollerna.
+check(raw_status(b"POST /v1/me HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nx-sn-csrf: 1\r\n"
+                 b"Content-Length: 1048577\r\n\r\n") == 413,
+      "för stor kropp avvisas med 413 direkt på Content-Length, innan något läses")
+bad = urllib.request.Request(BASE + "/v1/bodies/00000000-0000-0000-0000-000000000000/views", data=b"{ inte json",
+                             method="POST", headers={"content-type": "application/json", "x-sn-csrf": "1"})
+try:
+    bad_status = anon.open(bad).status
+except urllib.error.HTTPError as e:
+    bad_status = e.code
+check(bad_status == 401, "inloggning kontrolleras innan kroppen tolkas (trasig JSON från anonym ger 401, inte 400)")
 
 reg = login("Medlemsregistrerare")
 st, me, hdrs = call(reg, "GET", "/v1/me")

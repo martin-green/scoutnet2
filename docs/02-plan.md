@@ -2,7 +2,12 @@
 
 > Ett modernt, API-först medlemssystem för Scouterna, skrivet i Rust.
 > Bygger på analysen i [01-analys-av-scoutnet.md](./01-analys-av-scoutnet.md).
-> Version 0.7, 2026-10-18. Ett levande dokument där beslut dokumenteras som ADR:er i `docs/adr/`.
+> Version 0.8, 2026-10-23. Ett levande dokument där beslut dokumenteras som ADR:er i `docs/adr/`.
+>
+> **Ändringar i 0.8:**
+> - Nytt avsnitt 7.7 med lärdomar från **PHP2Shell** (CVE-2026-109618 och CVE-2026-109619): minnessäker Rust hela vägen ner, gränser för storlek, tid och samtidighet innan något tolkas, kontroll av inloggning före tolkning, farliga filer i en egen process, begränsad skada, upptäckt och patchning inom 24 timmar.
+> - Prototypen har gränserna, tester för dem och beroendegranskning med `cargo deny`. Granskningen hittade fyra kända sårbarheter: tre är rättade och en är ett dokumenterat undantag.
+> - Ny risk (17) och ADR-017 (resursgränser och isolering).
 >
 > **Ändringar i 0.7:**
 > - Moduler är först ett sätt för utvecklare att bidra utan att störa varandra: en ny modul läggs till utan att kärnan görs om ([06-moduler.md](./06-moduler.md), avsnitt 1.1). De utbyggnadspunkter i kärnan som modulerna behöver är samlade i en tabell (avsnitt 13).
@@ -41,6 +46,7 @@
 6. [API-design](#6-api-design)
 7. [Säkerhet](#7-säkerhet)
    - [7.2 Inloggning via ScoutID (Keycloak)](#72-inloggning-via-scoutid-keycloak)
+   - [7.7 Lärdomar från PHP2Shell](#77-lärdomar-från-php2shell-cve-2026-109618-och-cve-2026-109619)
 8. [Integritet och GDPR](#8-integritet-och-gdpr)
 9. [UX och design](#9-ux-och-design)
 10. [Närvaro och bidrag (Skojjt-integration)](#10-närvaro-och-bidrag-skojjt-integration)
@@ -206,7 +212,7 @@ flowchart LR
 | Kryptering | Envelope-kryptering med AES-256-GCM (`aws-lc-rs`), datanycklar wrappade i Azure Key Vault, HMAC-baserade blindindex | Fältnivåskydd för personnummer, skyddad identitet och hälsodata |
 | Observabilitet | `tracing` + OpenTelemetry → Prometheus/Loki/Tempo, PII-redigering i loggar | Spårbarhet utan dataläckage |
 | Frontend | **SvelteKit (TypeScript)** som SPA/PWA, **TanStack Table** + virtualisering, genererad typad klient från OpenAPI, eget designsystem. Alternativ: Leptos (Rust/WASM), se ADR-002. | Snabbt, litet bundle, moget ekosystem för tabeller och tillgänglighet. Typer följer kontraktet. |
-| Leveranskedja | `cargo-deny`, `cargo-audit`, Renovate, SBOM (CycloneDX), signerade images (cosign), distroless som non-root | Säker leveranskedja |
+| Leveranskedja | `cargo-deny`, `cargo-audit`, `cargo auditable`, Renovate, SBOM (CycloneDX), signerade images (cosign), distroless som non-root | Säker leveranskedja och snabb patchning (7.7) |
 
 ### 4.3 Rust: alltid senaste stabila version och nya konstruktioner
 
@@ -415,6 +421,7 @@ Kompatibilitets-API:et har följande regler:
 | API-missbruk | Läckta nycklar, skrapning | Scope-begränsade och utgående klienthemligheter, rate limits, inga nycklar i URL, loggning per klient |
 | Insider eller superadmin | Missbruk av breda rättigheter | Fyra ögon för superadmin-åtgärder, JIT-elevering (tidsbegränsad), läsloggning, separat granskningsroll |
 | Leveranskedja | Komprometterat beroende | cargo-deny/audit, låsta versioner, SBOM, signerade images, reproducerbara byggen |
+| Sårbarhet i plattformen eller körmiljön | PHP2Shell: kod körs utan inloggning via fel i språkets körmiljö | Minnessäker Rust, gränser och kontroller innan något tolkas, isolering och snabb patchning (7.7) |
 | Driftstörning | DDoS vid lägeranmälan | WAF, rate limits, köad anmälan, autoskalning |
 
 ### 7.2 Inloggning via ScoutID (Keycloak)
@@ -552,6 +559,48 @@ Detaljerna om bristerna finns i en konfidentiell bilaga (se analysen, avsnitt 13
 | Prenumerationslänkar (iCal) | iCal-flöden med slumpmässig token (minst 128 bitar) per användare och flöde. Kan återkallas. Inga medlemsnummer eller ID:n i URL:en. Endast det som användaren har rätt att se. |
 | Serialisering av svar | Explicita DTO:er per endpoint. Fält filtreras per dataklass. |
 | Publika formulär | Tema via designtokens (färg, logotyp), ingen fri CSS |
+
+### 7.7 Lärdomar från PHP2Shell (CVE-2026-109618 och CVE-2026-109619)
+
+Den 21 oktober 2026 publicerades två kritiska sårbarheter i PHP, kallade *PHP2Shell* (CVSS 4.0: 9,2). De ger en angripare möjlighet att köra egen kod på servern **utan att logga in**, och de utnyttjas redan. Källor: [CISA](https://www.cisa.gov/news-events/alerts/2026/10/21/critical-vulnerabilities-php-require-immediate-patching), [NCSC-NL](https://github.com/NCSC-NL/php2shell) och [watchTowr](https://watchtowr.com/intelligence/php-cve-2026-109618-faq/).
+
+| CVE | Vad som händer |
+|---|---|
+| CVE-2026-109618 | PHP får slut på minne mitt i uppbyggnaden av ett anrop. Interna data blir halvfärdiga, och städkoden litar ändå på dem (minneskorruption). |
+| CVE-2026-109619 | Tillstånd som hör till ett anrop lever kvar efter att minnet det pekar på har frigjorts. Nästa anrop i samma arbetsprocess använder det (use-after-free). |
+
+Det gemensamma:
+- **Felen sitter i PHP:s körmiljö**, som är skriven i C, och inte i applikationernas kod. Ingen kod i Scoutnet hade kunnat förhindra dem.
+- **Angreppet kan lyckas innan applikationens kod körs.** Det gäller särskilt mod_php, där PHP tolkar request-kroppen själv före applikationen.
+- **Inställningar skyddar inte helt.** Det enda som hjälper är att uppdatera PHP (8.5.12, 8.4.27, 8.3.36 eller 8.2.35) och starta om alla arbetsprocesser.
+
+Lärdomarna för Scoutnet 2 gäller alltså plattformen, inte enskilda funktioner:
+
+| # | Lärdom | Så gör Scoutnet 2 | Status |
+|---|---|---|---|
+| 1 | **Minnessäkerhet hela vägen ner** | I Scoutnet 2:s egen process är hela kedjan från HTTP-tolkningen (hyper) till hanterarna Rust. I säker Rust stoppar kompilatorn båda felklasserna: ett värde kan inte användas efter att det har frigjorts, och ett värde finns först när det är helt byggt. `unsafe_code = "forbid"` gäller hela workspace, även moduler. Webbappen är statiska filer som Rust-servern levererar, så det finns ingen Node- eller PHP-körmiljö i drift. | Prototyp |
+| 2 | **Stanna vid minnesbrist** | Om Rust inte får minne avbryts processen i stället för att fortsätta med halvfärdiga data. Plattformen startar en ny instans, och med flera instanser drabbas bara de anrop som pågick. | Inbyggt i Rust. Flera instanser i drift (16). |
+| 3 | **Begränsa resurserna per anrop** | Högst 1 MiB request-kropp. Ett större `Content-Length` avvisas med 413 innan något läses, och en kropp utan längd räknas medan den läses. Högst 10 s för att ta emot kroppen, 30 s per anrop och 256 samtidiga anrop per instans. Det ger en övre gräns för minnet. Filuppladdningar får egna vägar som strömmar till lagring. | Prototyp: [lib.rs](../crates/sn-server/src/lib.rs), testat i [tests/limits.rs](../crates/sn-server/tests/limits.rs) och rökprovet |
+| 4 | **Inget tolkas före kontrollerna** | PHP tolkar formulär och filuppladdningar automatiskt innan applikationen får anropet. I Scoutnet 2 läses kroppen bara när en hanterare ber om den, och inloggning och CSRF kontrolleras först. Trasig JSON från en anonym användare ger 401, inte 400. Det som går att nå utan inloggning är litet och listat: inloggningsflödet, hälsokontroll, API-dokumentation, statisk webbapp, iCal med token, compat-API med nyckel och signerade webhooks. | Prototyp, testat |
+| 5 | **Inget tillstånd per anrop i delat minne** | Ett anrops data ägs av anropet och försvinner med det. Delat tillstånd finns bara i `AppState` (databaspool, konfiguration och ScoutID:s metadata) och i oföränderliga tabeller. Regel i granskningen: en cache nycklas alltid på användare och behörighet, och data för ett anrop sparas aldrig globalt. | Prototyp. Regel i `CODEOWNERS`-granskningen. |
+| 6 | **Tolka farliga filer i en egen process** | Importer (BgMax, Excel, DAK), bilagor och inkommande e-post tolkas i en jobbprocess, inte i API-processen. Jobbprocessen har egen minnesgräns, inget nätverk och ingen skrivrätt i databasen utöver sin egen kö. Kraschar tolkningen påverkas inte API:t. | Fas 1 (jobb) |
+| 7 | **Begränsa skadan om något ändå händer** | Distroless-image **utan skal**. CISA råder att leta efter PHP-processer som startar ett skal, men i Scoutnet 2 finns inget skal att starta. Dessutom: <ul><li>ingen root, skrivskyddat filsystem och seccomp</li><li>utgående trafik bara till en tillåtelselista, så att verktyg inte kan laddas ned och data inte kan skickas ut</li><li>en databasroll med minsta behörighet, som inte kan läsa revisionsloggen eller ändra schemat</li><li>personnummer krypterade med nycklar i Key Vault (ADR-008)</li></ul> | Fas 1 (7.5) |
+| 8 | **Upptäcka** | Larm om serverprocessen startar en annan process (Tetragon eller Falco), om utgående anslutningar nekas, eller om omstarter på grund av minnesbrist ökar | Fas 1 (16) |
+| 9 | **Patcha snabbt** | Beroendena byggs in i programmet, så en rättning kräver ett nytt bygge. Tre krav följer av det:<ul><li>**Veta vad som finns:** `Cargo.lock`, SBOM och `cargo auditable`, som lägger beroendelistan i programmet så att Trivy eller Grype kan granska images som redan körs.</li><li>**Få veta direkt:** `cargo deny check` i varje PR och **varje natt, även utan ändringar**, eftersom nya sårbarheter publiceras utan att koden ändras. Renovate föreslår uppdateringar.</li><li>**Kunna rulla ut:** en kritisk sårbarhet ska vara rättad i produktion inom 24 timmar, via samma pipeline och med rullande uppdatering utan avbrott.</li></ul> | `deny.toml` i prototypen. CI och 24-timmarsmålet i fas 1. |
+
+**Granskningen av prototypen** med `cargo deny check` (23 oktober 2026) hittade fyra kända sårbarheter i beroendena:
+- **Rättade med `cargo update`:** tre av dem, i `ctutils` (RUSTSEC-2026-0385), `rustls-webpki` (RUSTSEC-2026-0382) och `webpki-roots` (RUSTSEC-2026-0381).
+- **Undantag:** den fjärde, Marvin-attacken i `rsa` (RUSTSEC-2023-0071), saknar rättning. Den gäller operationer med en privat RSA-nyckel, och `rsa` används bara för att verifiera ID-token från ScoutID med en publik nyckel. Därför är den ett dokumenterat undantag i [deny.toml](../deny.toml).
+
+Det visar varför granskningen måste köras hela tiden, och inte bara när ett beroende läggs till.
+
+**Vad Rust inte skyddar mot:**
+- **`unsafe` i beroenden och standardbiblioteket.** tokio, hyper och std innehåller granskad `unsafe`-kod, och även standardbiblioteket har haft sårbarheter. Därför följer vi senaste stabila Rust (4.3).
+- **C-kod under oss:** WAF och ingress framför servern (som tar emot anropet först), kryptografin i rustls (aws-lc-rs eller ring), Linuxkärnan och PostgreSQL. ScoutID (Keycloak) körs dessutom på Java. Punkterna 7–9 behövs alltså även med Rust, och ingressen ska också ha minsta möjliga funktion och patchas inom samma 24 timmar.
+- **Logiska fel:** behörighet, åtkomst till fel post och felnycklade cachar. Skyddet är behörighetsmodellen (7.3), egenskapsbaserade tester och granskning.
+- **Avbrott vid minnesbrist.** Att processen stannar är säkrare än att den fortsätter, men det är fortfarande ett avbrott. Därför behövs gränserna i punkt 3 och flera instanser.
+
+**Dagens Scoutnet** körs på PHP. Scouterna bör få bekräftat av Custard att alla miljöer har uppdaterats till rättad version och att arbetsprocesserna har startats om. Scoutnet 2-projektet provar inte dagens system mot sårbarheterna: sådana prov kräver systemägarens tillstånd.
 
 ## 8. Integritet och GDPR
 
@@ -942,7 +991,7 @@ gantt
 | E2E | Playwright för kritiska flöden: närvaro, ny medlem, väntelista, faktura och anmälan |
 | Tillgänglighet | axe-core i E2E, manuella skärmläsartester per fas |
 | Prestanda | Lasttester med k6 eller Goose (Rust) i CI-nattkörning mot produktionslik datamängd (syntetisk, 0,5 M personer) |
-| Säkerhet | clippy (pedantic), semgrep, cargo-audit/deny, gitleaks, ZAP baseline, `cargo-fuzz` för parsers, extern pentest |
+| Säkerhet | clippy (pedantic), semgrep, `cargo deny check` i varje PR och varje natt, gitleaks, ZAP baseline, `cargo-fuzz` för parsers, tester för gränser och kontrollordning (`tests/limits.rs`), extern pentest |
 | Migrering | Avstämningssvit per generalrepetition |
 
 ## 16. Drift och observabilitet
@@ -952,7 +1001,8 @@ gantt
 - **Loggar** utan personuppgifter: ID:n i stället för namn, och redigeringslager som testas.
 - **Revisionsloggen** är separat från driftloggar och har egen åtkomstkontroll (dataskyddsombud och säkerhet).
 - **Databas:** CloudNativePG med synkron replik och läsrepliker, PITR och kvartalsvisa återställningstester.
-- **Säkerhetsövervakning:** larm vid massexport, onormala inloggningar, policyavslag i hög takt och rolländringar på hög nivå.
+- **Säkerhetsövervakning:** larm vid massexport, onormala inloggningar, policyavslag i hög takt och rolländringar på hög nivå. Larm också om serverprocessen startar en annan process, om utgående anslutningar nekas eller om omstarter vid minnesbrist ökar (7.7).
+- **Patchning:** en kritisk sårbarhet i Rust, ett beroende eller en image ska vara rättad i produktion inom 24 timmar, via den vanliga pipelinen (7.7).
 - **Kapacitetsplanering** inför kända toppar: terminsstart, fakturautskick och anmälningsstart för stora läger.
 
 ## 17. Risker
@@ -966,6 +1016,7 @@ gantt
 | Förändringsmotstånd och dubbla system | Hög | Medel | Tidigt värde (närvaro), piloter, ambassadörer i distrikten, tydlig avvecklingsplan |
 | Ekonomifel (fakturor, avräkning) | Låg–medel | Mycket hög | Parallellkörning till öret, revisorsgodkännande, regler som data med tester |
 | Säkerhetsincident med barns data | Låg | Mycket hög | Hela avsnitt 7–8, pentester, beredskap |
+| Kritisk sårbarhet i Rust, ett beroende eller plattformen (som PHP2Shell för PHP) | Medel | Mycket hög | Minnessäker kod, gränser innan något tolkas, isolering, `cargo deny` varje natt och patchning inom 24 timmar (7.7) |
 | Beroende av ScoutID/Keycloak | Medel | Hög | ScoutID är nytt (produktion sedan oktober 2026) och drivs delvis av volontärer. Gemensam roadmap och drift med ScoutID-teamet, HA-konfiguration, nödinloggning (break-glass) för superadmin och gemensam incidentrutin. Scoutnet 2 bidrar med utvecklartid till ScoutID-providern. |
 | ScoutID saknar MFA, passkeys och BankID idag | Hög | Hög | MFA är krav före pilot (7.2.3). Planeras och finansieras tillsammans med ScoutID-teamet i fas 0–1. Som reserv körs piloten utan åtkomst till känsliga fält (personnummer, export) tills MFA finns. |
 | Lösenordsmigrering till ScoutID når inte alla | Medel | Medel | Lat migrering under lång tid, förprovisionering, "Glömt lösenord" och BankID, och målgivande kommunikation (12.5) |
@@ -993,6 +1044,7 @@ gantt
 | 014 | Behörighetskälla | Scoutnet 2:s egen databas är källa för behörighet, inte token-claims. ScoutID:s `memberships`-claim matas från Scoutnet 2:s IdP-API, med storleksgräns, för andra relying parties. |
 | 015 | Identifierare i adresser | **Beslutat i prototypen:** UUID (v7) är primärnyckel och används i alla relationer och integrationer. Enheter har dessutom ett nummer som är unikt per typ, och som för migrerade enheter är Scoutnets id (samma som Skojjt). Webbens adresser använder numret (`/kar/1001`) och API:t godtar nyckeln `group-1001`. Personer adresseras bara med UUID. |
 | 016 | Moduler | **Beslutat i prototypen:** inbyggda moduler med ett gemensamt kontrakt (manifest och Rust-trait) i en modulär monolit, aktiverade per enhet med arv nedåt, låsning och beroenden. Regler som data för lokal variation (Wasm bara vid behov). Externa appar via API, OAuth-scopes och webhooks. Inga insticksprogram som laddas vid körning. **Kärnan ändras inte för en enskild modul.** Det som saknas blir generella utbyggnadspunkter i kärnans SDK. Se [06-moduler.md](./06-moduler.md). |
+| 017 | Resursgränser och isolering | **Delvis beslutat i prototypen:** gränser för storlek, tid och samtidighet ligger utanför all appkod. Inloggning och CSRF kontrolleras innan kroppen tolkas. Farliga format tolkas i en egen jobbprocess. Kritiska sårbarheter rättas i produktion inom 24 timmar. Se 7.7. |
 
 ## 19. Nästa 30 dagar
 

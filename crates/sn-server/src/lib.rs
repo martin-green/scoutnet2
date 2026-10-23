@@ -1,21 +1,24 @@
 //! Scoutnet 2 – API-server (prototyp).
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use axum::{
     Json, Router,
-    extract::Request,
+    extract::{DefaultBodyLimit, Request},
     http::{HeaderName, HeaderValue, Method, StatusCode, header},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::get,
 };
 use sqlx::{PgPool, migrate::Migrator};
+use tower::limit::GlobalConcurrencyLimitLayer;
 use tower_http::{
     catch_panic::CatchPanicLayer,
     compression::CompressionLayer,
+    limit::RequestBodyLimitLayer,
     services::{ServeDir, ServeFile},
     set_header::SetResponseHeaderLayer,
+    timeout::{RequestBodyTimeoutLayer, TimeoutLayer},
     trace::TraceLayer,
 };
 use utoipa_scalar::{Scalar, Servable};
@@ -33,6 +36,17 @@ pub mod seed;
 pub use config::Config;
 
 pub static MIGRATOR: Migrator = sqlx::migrate!("./migrations");
+
+/// Största tillåtna request-kropp. API:t tar bara emot JSON. Framtida filuppladdningar
+/// får egna vägar med egna gränser och strömmas till lagring i stället för att läsas in i minnet.
+pub const MAX_BODY_BYTES: usize = 1024 * 1024;
+/// Längsta tid för ett helt anrop innan servern svarar 503.
+pub const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+/// Längsta tid för att ta emot kroppen. En klient som skickar för långsamt avbryts med ett klientfel.
+pub const BODY_TIMEOUT: Duration = Duration::from_secs(10);
+/// Högsta antal anrop som behandlas samtidigt i en instans. Övriga väntar.
+/// Tillsammans med [`MAX_BODY_BYTES`] ger det en övre gräns för minnet som kroppar kan ta.
+pub const MAX_CONCURRENT_REQUESTS: usize = 256;
 
 #[derive(Debug, Clone)]
 pub struct AppState {
@@ -103,8 +117,19 @@ pub fn app(state: &AppState) -> Router {
         app = app.fallback_service(spa);
     }
 
+    // Lagren läggs inifrån och ut: det sista lagret körs först.
+    // Gränserna ligger utanför all appkod, så att för stora eller långsamma anrop stoppas
+    // innan något tolkas (lärdom från PHP2Shell, se docs/02-plan.md avsnitt 7.7).
     security_headers(app)
         .layer(CompressionLayer::new())
+        // Storleken begränsas av RequestBodyLimitLayer nedan, så axums egen gräns stängs av (enligt axums dokumentation).
+        .layer(DefaultBodyLimit::disable())
+        .layer(GlobalConcurrencyLimitLayer::new(MAX_CONCURRENT_REQUESTS))
+        // Avvisar på Content-Length direkt, och räknar bytes när kroppen saknar längd.
+        // Ligger innanför tidsgränsen för kroppen så att axum känner igen felet och svarar 413.
+        .layer(RequestBodyLimitLayer::new(MAX_BODY_BYTES))
+        .layer(RequestBodyTimeoutLayer::new(BODY_TIMEOUT))
+        .layer(TimeoutLayer::with_status_code(StatusCode::SERVICE_UNAVAILABLE, REQUEST_TIMEOUT))
         // En panik i en hanterare ger 500 i stället för en stängd anslutning (och loggas av TraceLayer).
         .layer(CatchPanicLayer::custom(|_| {
             error::ApiError::Internal(anyhow::anyhow!("panik i hanterare")).into_response()

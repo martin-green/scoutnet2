@@ -33,7 +33,7 @@ cargo run -p sn-server --bin sn-server            # http://127.0.0.1:8080 (API, 
 - Demo med ett kommando (release-bygge, färsk data och med `-Perf` även 100 000 personer på port 8081): `./scripts/demo.ps1 -Perf`. Se [demo-miljö och generalrepetition](docs/03-prototyp.md#demo-miljö-och-generalrepetition).
 - API-dokumentation (OpenAPI 3.1, Scalar): <http://127.0.0.1:8080/docs>. Råspecifikationen finns på `/openapi.json`.
 - Utveckling av webben med hot reload: `cd web; npm run dev` (proxar API-anrop till port 8080). Typer från API:t genereras med `npm run api:types`.
-- Kvalitetskontroller: `cargo clippy --workspace --all-targets`, `cargo test --workspace`, `cd web; npm run check` och rökprovet `python scripts/smoke.py` (servern ska vara igång, och Keycloak för ScoutID-kontrollerna).
+- Kvalitetskontroller: `cargo clippy --workspace --all-targets`, `cargo test --workspace`, `cargo deny check` (beroenden: kända sårbarheter, licenser och källor, se [deny.toml](deny.toml)), `cd web; npm run check` och rökprovet `python scripts/smoke.py` (servern ska vara igång, och Keycloak för ScoutID-kontrollerna).
 - Storlek på testdata: `cargo run -p sn-server --bin seed -- --districts 4 --groups 5 --seed 42`.
 - Prestanda med 100 000 personer: seeda en separat databas med `--districts 28 --groups 28`, starta ett release-bygge och kör `python scripts/perf.py` (instruktioner i skriptet, resultat i [docs/05-prestanda.md](docs/05-prestanda.md)).
 - Integrationer: API-nycklar skapas per kår under *Integrationer*. `GET /api/group/memberlist` svarar i Scoutnets format (HTTP Basic: kårnummer och nyckel).

@@ -1,0 +1,50 @@
+# Granskning av beroenden med cargo-deny (https://github.com/EmbarkStudios/cargo-deny).
+# Kör: cargo deny check
+# Se docs/02-plan.md, avsnitt 7.7: snabb patchning börjar med att veta vad som finns i bygget.
+
+[graph]
+all-features = true
+
+[advisories]
+# Kända sårbarheter (RustSec) stoppar bygget. Ett undantag kräver en kommentar med skäl och slutdatum.
+yanked = "deny"
+unmaintained = "workspace"
+ignore = [
+    # Marvin-attacken gäller operationer med en privat RSA-nyckel (dekryptering och signering).
+    # rsa används bara av openidconnect för att verifiera ID-token från ScoutID med en publik nyckel,
+    # och Scoutnet 2 har ingen privat RSA-nyckel. Ingen rättad version finns. Ompröva när rsa 0.10 släpps.
+    { id = "RUSTSEC-2023-0071", reason = "rsa används bara för att verifiera signaturer med publik nyckel" },
+]
+
+[licenses]
+# Licenser som går att kombinera med MIT och publicera öppet.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "CDLA-Permissive-2.0",
+    "BSL-1.0",
+    "0BSD",
+]
+confidence-threshold = 0.9
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+deny = [
+    # TLS sköts av rustls. OpenSSL är C-kod med egen historik av minnesfel.
+    { name = "openssl" },
+    { name = "openssl-sys" },
+    { name = "native-tls" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
