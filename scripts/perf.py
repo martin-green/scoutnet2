@@ -2,11 +2,11 @@
 
 Förbered (separat databas, så att demodatan inte påverkas):
   docker exec <pg> psql -U scoutnet2 -c "CREATE DATABASE scoutnet2_perf OWNER scoutnet2"
-  $env:DATABASE_URL = "postgres://scoutnet2:scoutnet2-dev-only@127.0.0.1:5433/scoutnet2_perf"
+  $env:DATABASE_URL = "postgres://scoutnet2:scoutnet2-dev-only@127.0.0.1:5434/scoutnet2_perf"
   cargo run --release -p sn-server --bin seed -- --districts 28 --groups 28
-  $env:SN_BIND = "127.0.0.1:8081"; cargo run --release -p sn-server --bin sn-server
+  $env:SN_BIND = "127.0.0.1:8091"; cargo run --release -p sn-server --bin sn-server
 
-Kör: python scripts/perf.py [--base http://127.0.0.1:8081] [--n 40]
+Kör: python scripts/perf.py [--base http://127.0.0.1:8091] [--n 40]
 """
 import argparse
 import base64
@@ -19,7 +19,7 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 ap = argparse.ArgumentParser()
-ap.add_argument("--base", default="http://127.0.0.1:8081")
+ap.add_argument("--base", default="http://127.0.0.1:8091")
 ap.add_argument("--n", type=int, default=40, help="antal anrop per scenario")
 ap.add_argument("--concurrency", type=int, default=16)
 args = ap.parse_args()

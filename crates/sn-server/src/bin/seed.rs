@@ -28,7 +28,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://scoutnet2:scoutnet2-dev-only@127.0.0.1:5433/scoutnet2".into());
+        .unwrap_or_else(|_| "postgres://scoutnet2:scoutnet2-dev-only@127.0.0.1:5434/scoutnet2".into());
     let db =
         PgPoolOptions::new().max_connections(4).connect(&url).await.context("kunde inte ansluta till databasen")?;
     MIGRATOR.run(&db).await?;

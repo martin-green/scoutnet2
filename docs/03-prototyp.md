@@ -68,9 +68,9 @@ Skriptet gör följande:
 - startar PostgreSQL och ScoutID (Keycloak) i Docker
 - bygger servern (release) och webbappen
 - fyller demodatabasen med färsk syntetisk data
-- startar Scoutnet 2 på <http://127.0.0.1:8080>
+- startar Scoutnet 2 på <http://127.0.0.1:8090>
 
-Med `-Perf` startar det också en server med 100 000 personer på <http://127.0.0.1:8081>, med bara demoroller. Den databasen seedas bara första gången. För en snabb omstart utan bygge och ny data: `./scripts/demo.ps1 -SkipBuild -KeepData`.
+Med `-Perf` startar det också en server med 100 000 personer på <http://127.0.0.1:8091>, med bara demoroller. Den databasen seedas bara första gången. För en snabb omstart utan bygge och ny data: `./scripts/demo.ps1 -SkipBuild -KeepData`.
 
 Checklista, dagen före och en timme före:
 

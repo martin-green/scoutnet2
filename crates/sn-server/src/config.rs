@@ -41,9 +41,9 @@ impl std::fmt::Debug for OidcConfig {
 impl Config {
     pub fn from_env() -> anyhow::Result<Self> {
         let database_url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://scoutnet2:scoutnet2-dev-only@127.0.0.1:5433/scoutnet2".into());
+            .unwrap_or_else(|_| "postgres://scoutnet2:scoutnet2-dev-only@127.0.0.1:5434/scoutnet2".into());
         let bind = std::env::var("SN_BIND")
-            .unwrap_or_else(|_| "127.0.0.1:8080".into())
+            .unwrap_or_else(|_| "127.0.0.1:8090".into())
             .parse()
             .context("SN_BIND måste vara host:port")?;
         let web_dist = std::env::var_os("SN_WEB_DIST").map(PathBuf::from).or_else(|| {

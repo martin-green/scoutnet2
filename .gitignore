@@ -1,6 +1,3 @@
-# Inloggningsuppgifter och hemligheter – checka aldrig in
-custard.no.access.txt
-*.access.txt
 .env
 .env.*
 !.env.example

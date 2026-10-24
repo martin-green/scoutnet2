@@ -2,7 +2,7 @@
 
 `docker compose up -d` startar en Keycloak med realmen `scoutid`, som efterliknar nya ScoutID:
 
-- Klienten `scoutnet2-web` (konfidentiell, authorization code + PKCE S256), med redirect till `http://127.0.0.1:8080/auth/callback`.
+- Klienten `scoutnet2-web` (konfidentiell, authorization code + PKCE S256), med redirect till `http://127.0.0.1:8090/auth/callback`.
 - Claimet `scoutnet_member_no` i ID-tokenet (som scopet `profile` i ScoutID). Här hämtas det från användarnamnet, som är medlemsnumret.
 - Admin-konsol: <http://127.0.0.1:8180/admin> (`admin` / `admin-dev-only`).
 

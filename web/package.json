@@ -10,7 +10,7 @@
     "prepare": "svelte-kit sync || echo ''",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-    "api:types": "npx --yes openapi-typescript@7 http://127.0.0.1:8080/openapi.json -o src/lib/api/schema.d.ts"
+    "api:types": "npx --yes openapi-typescript@7 http://127.0.0.1:8090/openapi.json -o src/lib/api/schema.d.ts"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^4.0.0",

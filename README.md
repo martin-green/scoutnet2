@@ -23,16 +23,18 @@ Förstudie och **prototyp under arbete** (se [03-prototyp.md](docs/03-prototyp.m
 Krav: Rust (versionen väljs automatiskt av `rust-toolchain.toml`), Docker, Node 24 och Python 3 för rökprovet.
 
 ```powershell
-docker compose up -d                              # PostgreSQL 18 (127.0.0.1:5433) och lokal ScoutID/Keycloak (127.0.0.1:8180)
+docker compose up -d                              # PostgreSQL 18 (127.0.0.1:5434) och lokal ScoutID/Keycloak (127.0.0.1:8180)
 cargo run -p sn-server --bin seed                 # migrerar och fyller med syntetisk data (cirka 2 500 personer)
 cd web; npm ci; npm run build; cd ..              # bygger webbappen till web/build
-cargo run -p sn-server --bin sn-server            # http://127.0.0.1:8080 (API, webbapp och /docs)
+cargo run -p sn-server --bin sn-server            # http://127.0.0.1:8090 (API, webbapp och /docs)
 ```
 
-- Öppna <http://127.0.0.1:8080> och välj **Logga in med ScoutID** (testkonton i [deploy/keycloak/README.md](deploy/keycloak/README.md), lösenord `scout`), eller en demoroll för snabbinloggning. Enheter har läsbara adresser, t.ex. <http://127.0.0.1:8080/kar/1001>, `/avdelning/5002/narvaro` och `/kar/1001/bidrag`.
-- Demo med ett kommando (release-bygge, färsk data och med `-Perf` även 100 000 personer på port 8081): `./scripts/demo.ps1 -Perf`. Se [demo-miljö och generalrepetition](docs/03-prototyp.md#demo-miljö-och-generalrepetition).
-- API-dokumentation (OpenAPI 3.1, Scalar): <http://127.0.0.1:8080/docs>. Råspecifikationen finns på `/openapi.json`.
-- Utveckling av webben med hot reload: `cd web; npm run dev` (proxar API-anrop till port 8080). Typer från API:t genereras med `npm run api:types`.
+Portarna (5434, 8090, 8091 och 8180) är valda för att inte krocka med Skojjt, som använder 5433 och 8080. Båda projekten kan alltså köras samtidigt.
+
+- Öppna <http://127.0.0.1:8090> och välj **Logga in med ScoutID** (testkonton i [deploy/keycloak/README.md](deploy/keycloak/README.md), lösenord `scout`), eller en demoroll för snabbinloggning. Enheter har läsbara adresser, t.ex. <http://127.0.0.1:8090/kar/1001>, `/avdelning/5002/narvaro` och `/kar/1001/bidrag`.
+- Demo med ett kommando (release-bygge, färsk data och med `-Perf` även 100 000 personer på port 8091): `./scripts/demo.ps1 -Perf`. Se [demo-miljö och generalrepetition](docs/03-prototyp.md#demo-miljö-och-generalrepetition).
+- API-dokumentation (OpenAPI 3.1, Scalar): <http://127.0.0.1:8090/docs>. Råspecifikationen finns på `/openapi.json`.
+- Utveckling av webben med hot reload: `cd web; npm run dev` (proxar API-anrop till port 8090). Typer från API:t genereras med `npm run api:types`.
 - Kvalitetskontroller: `cargo clippy --workspace --all-targets`, `cargo test --workspace`, `cargo deny check` (beroenden: kända sårbarheter, licenser och källor, se [deny.toml](deny.toml)), `cd web; npm run check` och rökprovet `python scripts/smoke.py` (servern ska vara igång, och Keycloak för ScoutID-kontrollerna).
 - Storlek på testdata: `cargo run -p sn-server --bin seed -- --districts 4 --groups 5 --seed 42`.
 - Prestanda med 100 000 personer: seeda en separat databas med `--districts 28 --groups 28`, starta ett release-bygge och kör `python scripts/perf.py` (instruktioner i skriptet, resultat i [docs/05-prestanda.md](docs/05-prestanda.md)).

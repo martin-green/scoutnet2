@@ -7,12 +7,12 @@
     2. Bygger servern (release) och webbappen.
     3. Fyller demodatabasen med färsk syntetisk data (cirka 2 500 personer).
     4. Med -Perf: fyller databasen scoutnet2_perf med cirka 100 000 personer (bara första gången)
-       och startar en andra server på http://127.0.0.1:8081 för prestandademon.
-    5. Startar Scoutnet 2 på http://127.0.0.1:8080. Avsluta med Ctrl+C.
+       och startar en andra server på http://127.0.0.1:8091 för prestandademon.
+    5. Startar Scoutnet 2 på http://127.0.0.1:8090. Avsluta med Ctrl+C.
 
 .EXAMPLE
     ./scripts/demo.ps1              # demo med standarddata
-    ./scripts/demo.ps1 -Perf        # även 100 000 personer på port 8081
+    ./scripts/demo.ps1 -Perf        # även 100 000 personer på port 8091
     ./scripts/demo.ps1 -SkipBuild -KeepData   # snabb omstart utan bygge och utan ny data
 #>
 param(
@@ -23,8 +23,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-Location (Join-Path $PSScriptRoot '..')
-$devUrl = 'postgres://scoutnet2:scoutnet2-dev-only@127.0.0.1:5433/scoutnet2'
-$perfUrl = 'postgres://scoutnet2:scoutnet2-dev-only@127.0.0.1:5433/scoutnet2_perf'
+$devUrl = 'postgres://scoutnet2:scoutnet2-dev-only@127.0.0.1:5434/scoutnet2'
+$perfUrl = 'postgres://scoutnet2:scoutnet2-dev-only@127.0.0.1:5434/scoutnet2_perf'
 $server = Join-Path (Get-Location) 'target\release\sn-server.exe'
 $seed = Join-Path (Get-Location) 'target\release\seed.exe'
 
@@ -65,16 +65,16 @@ if ($Perf) {
         & $seed --districts 28 --groups 28; Assert-Ok 'seed (perf)'
         Sql 'scoutnet2_perf' 'VACUUM ANALYZE' | Out-Null
     }
-    Step 'Startar prestandaservern på http://127.0.0.1:8081 (100 000 personer, bara demoroller)'
+    Step 'Startar prestandaservern på http://127.0.0.1:8091 (100 000 personer, bara demoroller)'
     $env:DATABASE_URL = $perfUrl
-    $env:SN_BIND = '127.0.0.1:8081'
-    $env:SN_OIDC_ISSUER = ' '   # blanksteg stänger av ScoutID (redirect-adressen är registrerad för port 8080)
+    $env:SN_BIND = '127.0.0.1:8091'
+    $env:SN_OIDC_ISSUER = ' '   # blanksteg stänger av ScoutID (redirect-adressen är registrerad för port 8090)
     $env:RUST_LOG = 'warn'
     $perfProc = Start-Process -FilePath $server -PassThru -NoNewWindow
 }
 
 $env:DATABASE_URL = $devUrl
-$env:SN_BIND = '127.0.0.1:8080'
+$env:SN_BIND = '127.0.0.1:8090'
 Remove-Item Env:SN_OIDC_ISSUER, Env:RUST_LOG -ErrorAction SilentlyContinue
 
 Step 'Väntar på ScoutID (Keycloak)'
@@ -86,9 +86,9 @@ for ($i = 0; $i -lt 40 -and -not $ready; $i++) {
 }
 if (-not $ready) { Write-Warning 'Keycloak svarar inte. Demorollerna fungerar ändå, men inte ScoutID-inloggningen.' }
 
-Step 'Startar Scoutnet 2 på http://127.0.0.1:8080'
+Step 'Startar Scoutnet 2 på http://127.0.0.1:8090'
 Write-Host 'Logga in med en demoroll, eller med ScoutID (testkonton i deploy/keycloak/README.md, lösenord scout).'
-if ($perfProc) { Write-Host 'Prestandademo: http://127.0.0.1:8081 och python scripts/perf.py' }
+if ($perfProc) { Write-Host 'Prestandademo: http://127.0.0.1:8091 och python scripts/perf.py' }
 try {
     & $server
 } finally {

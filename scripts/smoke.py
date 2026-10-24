@@ -1,6 +1,6 @@
 """Rökprov mot lokal server: inloggning med personas, behörighet och medlemslistan.
 
-Kör: python scripts/smoke.py   (servern ska vara igång på http://127.0.0.1:8080 med seedad data)
+Kör: python scripts/smoke.py   (servern ska vara igång på http://127.0.0.1:8090 med seedad data)
 """
 import base64
 import http.cookiejar
@@ -10,7 +10,7 @@ import sys
 import urllib.error
 import urllib.request
 
-BASE = "http://127.0.0.1:8080"
+BASE = "http://127.0.0.1:8090"
 ok = True
 
 
